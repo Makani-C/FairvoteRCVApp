@@ -114,8 +114,34 @@ async function fetchAPI(endpoint, options = {}) {
     try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
 
+        // Not OK response - attempt to parse error details from response
         if (!response.ok) {
-            throw new Error(`API error: ${response.status}`);
+            // Try to get detailed error message from response body
+            let errorMessage = `API error: ${response.status}`;
+            try {
+                // Attempt to parse response as JSON to get detailed error
+                const errorData = await response.json();
+
+                // Check different possible error formats
+                if (errorData.detail) {
+                    errorMessage = errorData.detail;
+                } else if (errorData.message) {
+                    errorMessage = errorData.message;
+                } else if (errorData.error) {
+                    errorMessage = typeof errorData.error === 'string' ?
+                        errorData.error : JSON.stringify(errorData.error);
+                } else if (typeof errorData === 'string') {
+                    errorMessage = errorData;
+                } else {
+                    // If we have a complex object, stringify it
+                    errorMessage = `Error ${response.status}: ${JSON.stringify(errorData)}`;
+                }
+            } catch (parseError) {
+                // If we can't parse JSON, use status text
+                errorMessage = `Error ${response.status}: ${response.statusText || 'Unknown error'}`;
+            }
+
+            throw new Error(errorMessage);
         }
 
         // Check if response is empty (for DELETE requests)
@@ -126,7 +152,11 @@ async function fetchAPI(endpoint, options = {}) {
         return await response.json();
     } catch (error) {
         console.error('API request failed:', error);
-        alert(`API request failed: ${error.message}`);
+
+        // Display error in popup with formatted message
+        const errorMessage = error.message || 'Unknown error occurred';
+        showPopup(errorMessage, 'Error', 'error');
+
         return null;
     } finally {
         loading.classList.add('hidden');
@@ -306,8 +336,7 @@ async function handleCreatePoll(e) {
         .filter(text => text !== '');
 
     if (options.length < 2) {
-        alert('Please provide at least 2 options.');
-        return;
+        showPopup('Please provide at least 2 options.', 'Error', 'error');
     }
 
     const pollData = {
@@ -327,9 +356,10 @@ async function handleCreatePoll(e) {
     });
 
     if (result) {
-        alert('Poll created successfully!');
-        document.getElementById('create-poll-form').reset();
-        navigateTo('poll-detail', result.id);
+       showPopup('Poll created successfully!', 'Success', 'success', () => {
+            document.getElementById('create-poll-form').reset();
+            navigateTo('poll-detail', result.id);
+        });
     }
 }
 
@@ -343,8 +373,7 @@ async function handleSubmitVote() {
 
     // Validate email
     if (!email || !isValidEmail(email)) {
-        alert('Please enter a valid email address.');
-        return;
+        showPopup('Please enter a valid email address.', 'Error', 'error');
     }
 
     // Collect the rankings from all options that have a rank selected
@@ -368,8 +397,7 @@ async function handleSubmitVote() {
 
     // Validate that at least one option is ranked
     if (rankings.length === 0) {
-        alert('Please rank at least one option.');
-        return;
+        showPopup('Please enter a valid email address.', 'Error', 'error');
     }
 
     // Create the vote data object in the format expected by your backend
@@ -396,8 +424,9 @@ async function handleSubmitVote() {
     });
 
     if (result) {
-        alert('Your vote has been recorded!');
-        navigateTo('results', currentPollId);
+        showPopup('Your vote has been recorded!', 'Success', 'success', () => {
+            navigateTo('results', currentPollId);
+        });
     }
 }
 
@@ -439,8 +468,7 @@ function removeOptionInput(optionElement) {
 
     // Prevent removing if we only have 2 options left
     if (optionInputs.length <= 2) {
-        alert('A poll must have at least 2 options.');
-        return;
+        showPopup('A poll must have at least 2 options.', 'Information', 'info');
     }
 
     optionElement.remove();
@@ -653,3 +681,109 @@ function renderResultsVisualization(resultsData) {
         }
     }
 }
+
+/**
+ * Shows a popup message
+ * @param {string} message - The message to display
+ * @param {string} title - The title of the popup
+ * @param {string} type - The type of popup (success, error, info)
+ * @param {Function} callback - Optional callback function to execute when popup is closed
+ */
+function showPopup(message, title = 'Message', type = 'info', callback = null) {
+    const popupContainer = document.getElementById('popup-container');
+    const popupTitle = document.getElementById('popup-title');
+    const popupMessage = document.getElementById('popup-message');
+    const popup = popupContainer.querySelector('.popup');
+
+    // Set content
+    popupTitle.textContent = title;
+    popupMessage.textContent = message;
+
+    // Remove existing type classes and add the new one
+    popup.classList.remove('success', 'error', 'info');
+    popup.classList.add(type);
+
+    // Show the popup
+    popupContainer.classList.remove('hidden');
+
+    // Add active class after a small delay for animation
+    setTimeout(() => {
+        popupContainer.classList.add('active');
+    }, 10);
+
+    // Set up close handlers
+    const closePopup = () => {
+        popupContainer.classList.remove('active');
+        setTimeout(() => {
+            popupContainer.classList.add('hidden');
+            if (callback && typeof callback === 'function') {
+                callback();
+            }
+        }, 300); // Waiting for transition to complete
+    };
+
+    document.getElementById('popup-close').onclick = closePopup;
+    document.getElementById('popup-ok').onclick = closePopup;
+
+    // Close when clicking outside
+    popupContainer.addEventListener('click', (e) => {
+        if (e.target === popupContainer) {
+            closePopup();
+        }
+    });
+}
+
+/**
+ * Shows a toast notification
+ * @param {string} message - The message to display
+ * @param {string} type - The type of toast (success, error, info)
+ * @param {number} duration - How long to show the toast in milliseconds
+ */
+function showToast(message, type = 'info', duration = 3000) {
+    // Create toast container if it doesn't exist
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container';
+        document.body.appendChild(toastContainer);
+    }
+
+    // Create the toast
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+
+    // Determine icon based on type
+    let icon = '✓';
+    if (type === 'error') icon = '✕';
+    if (type === 'info') icon = 'ℹ';
+
+    toast.innerHTML = `
+        <div class="toast-icon">${icon}</div>
+        <div class="toast-message">${message}</div>
+    `;
+
+    // Add to container
+    toastContainer.appendChild(toast);
+
+    // Trigger animation
+    setTimeout(() => {
+        toast.classList.add('active');
+    }, 10);
+
+    // Remove after duration
+    setTimeout(() => {
+        toast.classList.remove('active');
+        setTimeout(() => {
+            toast.remove();
+        }, 300);
+    }, duration);
+}
+
+const originalAlert = window.alert;
+window.alert = function(message) {
+    if (message.includes('success') || message.includes('created') || message.includes('recorded')) {
+        showPopup(message, 'Success', 'success');
+    } else {
+        showPopup(message, 'Alert', 'info');
+    }
+};
