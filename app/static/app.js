@@ -46,9 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
         navigateTo('results', currentPollId);
     });
 
-    // Set up voting form submission
-    document.getElementById('voting-form').addEventListener('submit', handleSubmitVote);
-
     // Set up results page back button
     document.getElementById('back-to-poll').addEventListener('click', () => {
         navigateTo('poll-detail', currentPollId);
