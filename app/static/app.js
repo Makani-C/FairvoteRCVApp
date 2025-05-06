@@ -10,9 +10,15 @@ const pollsList = document.getElementById('polls-list');
 // Current state
 let currentPollId = null;
 let currentPoll = null;
+let isAdmin = false;
+let adminToken = null;
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
+    // Check for admin session
+    adminToken = localStorage.getItem('adminToken');
+    isAdmin = !!adminToken;
+
     // Set up navigation
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
@@ -51,6 +57,60 @@ document.addEventListener('DOMContentLoaded', () => {
         navigateTo('poll-detail', currentPollId);
     });
 
+    // Set up admin login form
+    document.getElementById('admin-login-form').addEventListener('submit', handleAdminLogin);
+
+    // Set up admin tabs
+    document.querySelectorAll('.admin-tab-btn').forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Remove active class from all tabs
+            document.querySelectorAll('.admin-tab-btn').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.add('hidden'));
+
+            // Add active class to clicked tab
+            tab.classList.add('active');
+
+            // Show corresponding content
+            const tabId = tab.getAttribute('data-tab');
+            document.getElementById(`${tabId}-tab`).classList.remove('hidden');
+
+            // Load content based on tab
+            if (tabId === 'manage-polls') {
+                loadAdminPolls();
+            } else if (tabId === 'view-voters') {
+                loadPollsForVotersDropdown();
+                document.getElementById('voters-list').innerHTML = '<p>Please select a poll to view voters.</p>';
+            }
+        });
+    });
+
+    // Set up poll selection for voters
+    document.getElementById('select-poll-for-voters').addEventListener('change', function() {
+        const pollId = this.value;
+        if (pollId) {
+            loadVotersForPoll(pollId);
+        } else {
+            document.getElementById('voters-list').innerHTML = '<p>Please select a poll to view voters.</p>';
+        }
+    });
+
+    // Set up edit poll form
+    document.getElementById('edit-poll-form').addEventListener('submit', handleEditPoll);
+
+    document.getElementById('edit-add-option').addEventListener('click', addEditOptionInput);
+
+    // Set up cancel edit button
+    document.getElementById('cancel-edit').addEventListener('click', () => {
+        navigateTo('admin-dashboard');
+    });
+
+    // Set up edit options container for event delegation
+    document.getElementById('edit-options-container').addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-option')) {
+            removeEditOptionInput(e.target.parentElement);
+        }
+    });
+
     // Initialize page based on URL hash or default to polls
     const hash = window.location.hash.substring(1);
     if (hash) {
@@ -75,6 +135,14 @@ function navigateTo(page, id = null) {
 
     // Show loading indicator
     loading.classList.remove('hidden');
+
+    // Check admin routes protection
+    if (page.startsWith('admin') && page !== 'admin-login' && !isAdmin) {
+        showPopup('You need to login as admin first.', 'Access Denied', 'error', () => {
+            navigateTo('admin-login');
+        });
+        return;
+    }
 
     // Load appropriate page
     switch(page) {
@@ -103,6 +171,22 @@ function navigateTo(page, id = null) {
             document.getElementById('results-page').classList.remove('hidden');
             break;
 
+        case 'admin-login':
+            document.getElementById('admin-login-page').classList.remove('hidden');
+            loading.classList.add('hidden');
+            break;
+
+        case 'admin-dashboard':
+            // Load admin dashboard content
+            loadAdminPolls();
+            document.getElementById('admin-dashboard-page').classList.remove('hidden');
+            break;
+
+        case 'edit-poll':
+            loadEditPollForm(id);
+            document.getElementById('edit-poll-page').classList.remove('hidden');
+            break;
+
         default:
             console.error('Unknown page:', page);
             navigateTo('polls');
@@ -112,10 +196,41 @@ function navigateTo(page, id = null) {
 // API Functions
 async function fetchAPI(endpoint, options = {}) {
     try {
+        // Add auth token for admin endpoints if available
+        if (adminToken && !options.headers) {
+            options.headers = {
+                'Authorization': `Bearer ${adminToken}`
+            };
+        } else if (adminToken && options.headers) {
+            options.headers['Authorization'] = `Bearer ${adminToken}`;
+        }
+
+        if (options.method === 'POST' || options.method === 'PUT') {
+            if (!options.headers) {
+                options.headers = {};
+            }
+            if (!options.headers['Content-Type']) {
+                options.headers['Content-Type'] = 'application/json';
+            }
+        }
+
         const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
 
         // Not OK response - attempt to parse error details from response
         if (!response.ok) {
+            // Handle unauthorized access
+            if (response.status === 401 || response.status === 403) {
+                isAdmin = false;
+                localStorage.removeItem('adminToken');
+
+                if (window.location.hash.startsWith('#admin') && window.location.hash !== '#admin-login') {
+                    showPopup('Your session has expired. Please login again.', 'Session Expired', 'error', () => {
+                        navigateTo('admin-login');
+                    });
+                    throw new Error('Unauthorized access');
+                }
+            }
+
             // Try to get detailed error message from response body
             let errorMessage = `API error: ${response.status}`;
             try {
@@ -178,8 +293,15 @@ async function loadPolls() {
         polls.forEach(poll => {
             const pollCard = document.createElement('div');
             pollCard.className = 'poll-card';
+
+            // Display locked status if poll is locked
+            let lockedStatus = '';
+            if (poll.locked) {
+                lockedStatus = '<span class="status-badge locked-badge">Locked</span>';
+            }
+
             pollCard.innerHTML = `
-                <h3>${escapeHTML(poll.title)}</h3>
+                <h3>${escapeHTML(poll.title)} ${lockedStatus}</h3>
                 <p>${escapeHTML(poll.description || 'No description')}</p>
                 <p><small>Created: ${new Date(poll.created_at).toLocaleDateString()}</small></p>
             `;
@@ -201,6 +323,18 @@ async function loadPollDetail(id) {
         document.getElementById('poll-detail-title').textContent = currentPoll.title;
         document.getElementById('poll-detail-description').textContent =
             currentPoll.description || 'No description provided.';
+
+        // Show locked status if poll is locked
+        const statusIndicator = document.getElementById('poll-status-indicator');
+        if (currentPoll.locked) {
+            statusIndicator.classList.remove('hidden');
+            document.getElementById('vote-button').disabled = true;
+            document.getElementById('vote-button').classList.add('disabled');
+        } else {
+            statusIndicator.classList.add('hidden');
+            document.getElementById('vote-button').disabled = false;
+            document.getElementById('vote-button').classList.remove('disabled');
+        }
     }
 }
 
@@ -212,6 +346,14 @@ async function loadVotingForm(id) {
     }
 
     if (currentPoll) {
+        // Check if poll is locked
+        if (currentPoll.locked) {
+            showPopup('This poll is locked and no longer accepting votes.', 'Poll Locked', 'error', () => {
+                navigateTo('poll-detail', id);
+            });
+            return;
+        }
+
         document.getElementById('voting-poll-title').textContent = currentPoll.title;
         document.getElementById('voting-poll-description').textContent =
             currentPoll.description || 'No description provided.';
@@ -323,6 +465,450 @@ async function loadResults(id) {
     }
 }
 
+// Admin Functions
+async function handleAdminLogin(e) {
+    e.preventDefault();
+
+    const username = document.getElementById('admin-username').value;
+
+    loading.classList.remove('hidden');
+
+    isAdmin = true;
+
+    showPopup('Login successful!', 'Success', 'success', () => {
+        navigateTo('admin-dashboard');
+    });
+
+    // Clear the form
+    document.getElementById('admin-login-form').reset();
+
+    // TODO - require password
+    // const result = await fetchAPI('/admin/login', {
+    //     method: 'POST',
+    //     headers: {
+    //         'Content-Type': 'application/json'
+    //     },
+    //     body: JSON.stringify({ username })
+    // });
+    //
+    // if (result && result.token) {
+    //     adminToken = result.token;
+    //     localStorage.setItem('adminToken', adminToken);
+    //     isAdmin = true;
+    //
+    //     showPopup('Login successful!', 'Success', 'success', () => {
+    //         navigateTo('admin-dashboard');
+    //     });
+    //
+    //     // Clear the form
+    //     document.getElementById('admin-login-form').reset();
+    // }
+}
+
+
+async function loadAdminPolls() {
+    if (!isAdmin) {
+        navigateTo('admin-login');
+        return;
+    }
+
+    const adminPollsList = document.getElementById('admin-polls-list');
+    const polls = await fetchAPI('/polls/');
+
+    if (polls) {
+        adminPollsList.innerHTML = '';
+
+        if (polls.length === 0) {
+            adminPollsList.innerHTML = '<p>No polls available.</p>';
+            return;
+        }
+
+        polls.forEach(poll => {
+            const pollCard = document.createElement('div');
+            pollCard.className = 'admin-poll-card';
+
+            pollCard.innerHTML = `
+                <div class="admin-poll-header">
+                    <h3 class="admin-poll-title">${escapeHTML(poll.title)}</h3>
+                    <div class="admin-poll-actions">
+                        <button class="admin-action-btn edit" data-id="${poll.id}">Edit</button>
+                        <button class="admin-action-btn ${poll.locked ? 'unlock' : 'lock'}" data-id="${poll.id}">
+                            ${poll.locked ? 'Unlock' : 'Lock'}
+                        </button>
+                        <button class="admin-action-btn delete" data-id="${poll.id}">Delete</button>
+                        <button class="admin-action-btn view-voters" data-id="${poll.id}">View Voters</button>
+                    </div>
+                </div>
+                <p>${escapeHTML(poll.description || 'No description')}</p>
+                <div class="admin-poll-meta">
+                    <span>Status: <strong>${poll.locked ? 'Locked' : 'Open'}</strong></span>
+                    <span>Created: ${new Date(poll.created_at).toLocaleDateString()}</span>
+                    <span>Options: ${poll.options.length}</span>
+                </div>
+            `;
+
+            // Add event listeners for the action buttons
+            pollCard.querySelector('.edit').addEventListener('click', (e) => {
+                e.stopPropagation();
+                navigateTo('edit-poll', poll.id);
+            });
+
+            pollCard.querySelector('.delete').addEventListener('click', (e) => {
+                e.stopPropagation();
+                confirmDeletePoll(poll.id, poll.title);
+            });
+
+            const lockButton = pollCard.querySelector('.lock, .unlock');
+            lockButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                togglePollLock(poll.id, poll.locked);
+            });
+
+            pollCard.querySelector('.view-voters').addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Switch to voters tab and load data for this poll
+                document.querySelector('.admin-tab-btn[data-tab="view-voters"]').click();
+                document.getElementById('select-poll-for-voters').value = poll.id;
+                loadVotersForPoll(poll.id);
+            });
+
+            adminPollsList.appendChild(pollCard);
+        });
+    }
+}
+
+async function loadPollsForVotersDropdown() {
+    if (!isAdmin) {
+        navigateTo('admin-login');
+        return;
+    }
+
+    const selectPoll = document.getElementById('select-poll-for-voters');
+    const polls = await fetchAPI('/polls/');
+
+    if (polls) {
+        // Clear existing options
+        selectPoll.innerHTML = '<option value="">Select a poll</option>';
+
+        polls.forEach(poll => {
+            const option = document.createElement('option');
+            option.value = poll.id;
+            option.textContent = poll.title;
+            selectPoll.appendChild(option);
+        });
+    }
+}
+
+async function loadVotersForPoll(pollId) {
+    if (!isAdmin) {
+        navigateTo('admin-login');
+        return;
+    }
+
+    const votersList = document.getElementById('voters-list');
+    votersList.innerHTML = '<p>Loading voters...</p>';
+
+    const votes = await fetchAPI(`/votes/poll/${pollId}`);
+
+    if (votes) {
+        if (votes.length === 0) {
+            votersList.innerHTML = '<p>No votes have been cast for this poll yet.</p>';
+            return;
+        }
+
+        // Create table of voters
+        const table = document.createElement('table');
+        table.className = 'voters-table';
+
+        // Create table header
+        const thead = document.createElement('thead');
+        thead.innerHTML = `
+            <tr>
+                <th>Email</th>
+                <th>Voted On</th>
+                <th>Rankings</th>
+            </tr>
+        `;
+        table.appendChild(thead);
+
+        // Create table body
+        const tbody = document.createElement('tbody');
+
+        votes.forEach(vote => {
+            const tr = document.createElement('tr');
+
+            // Format rankings as a readable string
+            const rankingsStr = Object.entries(vote.rankings)
+                .map(([optId, rank]) => `Option ${optId}: ${rank}`)
+                .join(', ');
+
+            tr.innerHTML = `
+                <td>${escapeHTML(vote.email)}</td>
+                <td>${new Date(vote.created_at).toLocaleString()}</td>
+                <td>${escapeHTML(rankingsStr)}</td>
+            `;
+
+            tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+        votersList.innerHTML = '';
+        votersList.appendChild(table);
+    }
+}
+
+async function loadEditPollForm(id) {
+    if (!isAdmin) {
+        navigateTo('admin-login');
+        return;
+    }
+
+    currentPollId = id;
+    currentPoll = await fetchAPI(`/polls/${id}`);
+
+    if (currentPoll) {
+        // Fill in the form fields
+        document.getElementById('edit-poll-id').value = currentPoll.id;
+        document.getElementById('edit-poll-title').value = currentPoll.title;
+        document.getElementById('edit-poll-description').value = currentPoll.description || '';
+        document.getElementById('poll-status').value = currentPoll.locked ? 'locked' : 'open';
+
+        // Set up options
+        const optionsContainer = document.getElementById('edit-options-container');
+        optionsContainer.innerHTML = '';
+
+        currentPoll.options.forEach(option => {
+            const optionInput = document.createElement('div');
+            optionInput.className = 'edit-option-input';
+
+            // Store the option ID if available
+            const optionId = typeof option === 'object' ? option.id : '';
+            const optionText = typeof option === 'object' ? option.text : option;
+
+            optionInput.innerHTML = `
+                <input type="text" class="poll-option" value="${escapeHTML(optionText)}" required data-id="${optionId}">
+                <button type="button" class="remove-option">×</button>
+            `;
+
+            optionsContainer.appendChild(optionInput);
+        });
+
+        // Show remove buttons if we have more than 2 options
+        if (currentPoll.options.length <= 2) {
+            optionsContainer.querySelectorAll('.remove-option').forEach(button => {
+                button.classList.add('hidden');
+            });
+        }
+    }
+
+    loading.classList.add('hidden');
+}
+
+function addEditOptionInput() {
+    const optionsContainer = document.getElementById('edit-options-container');
+    const optionInputs = optionsContainer.querySelectorAll('.edit-option-input');
+
+    // Show remove buttons if we're adding more than the minimum
+    if (optionInputs.length >= 2) {
+        optionInputs.forEach(input => {
+            input.querySelector('.remove-option').classList.remove('hidden');
+        });
+    }
+
+    const newOption = document.createElement('div');
+    newOption.className = 'edit-option-input';
+    newOption.innerHTML = `
+        <input type="text" class="poll-option" required>
+        <button type="button" class="remove-option">×</button>
+    `;
+
+    optionsContainer.appendChild(newOption);
+}
+
+function removeEditOptionInput(optionElement) {
+    const optionsContainer = document.getElementById('edit-options-container');
+    const optionInputs = optionsContainer.querySelectorAll('.edit-option-input');
+
+    // Prevent removing if we only have 2 options left
+    if (optionInputs.length <= 2) {
+        showPopup('A poll must have at least 2 options.', 'Information', 'info');
+        return;
+    }
+
+    optionElement.remove();
+
+    // Hide remove buttons if we're down to the minimum
+    const remainingInputs = optionsContainer.querySelectorAll('.edit-option-input');
+    if (remainingInputs.length <= 2) {
+        remainingInputs.forEach(input => {
+            input.querySelector('.remove-option').classList.add('hidden');
+        });
+    }
+}
+
+async function handleEditPoll(e) {
+    e.preventDefault();
+
+    const pollId = document.getElementById('edit-poll-id').value;
+    const title = document.getElementById('edit-poll-title').value;
+    const description = document.getElementById('edit-poll-description').value;
+    const status = document.getElementById('poll-status').value;
+
+    const optionInputs = document.querySelectorAll('#edit-options-container .poll-option');
+    const options = [];
+    const optionIds = [];
+
+    // Collect options data
+    optionInputs.forEach(input => {
+        const text = input.value.trim();
+        const id = input.dataset.id;
+
+        if (text !== '') {
+            if (id) {
+                // This is an existing option
+                options.push({
+                    id: parseInt(id),
+                    text: text
+                });
+                optionIds.push(parseInt(id));
+            } else {
+                // This is a new option
+                options.push({
+                    text: text
+                });
+            }
+        }
+    });
+
+    if (options.length < 2) {
+        showPopup('Please provide at least 2 options.', 'Error', 'error');
+        return;
+    }
+
+    const pollData = {
+        title,
+        description,
+        locked: status === 'locked',
+        options: options,
+        // Include IDs of options that should be kept (for backend to know which to delete)
+        option_ids: optionIds.length > 0 ? optionIds : undefined
+    };
+
+    loading.classList.remove('hidden');
+
+    const result = await fetchAPI(`/polls/${pollId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(pollData)
+    });
+
+    if (result) {
+        showPopup('Poll updated successfully!', 'Success', 'success', () => {
+            navigateTo('admin-dashboard');
+        });
+    }
+}
+
+async function togglePollLock(pollId, currentStatus) {
+    loading.classList.remove('hidden');
+
+    const newStatus = !currentStatus;
+    const statusLabel = newStatus ? 'locked' : 'unlocked';
+
+    const result = await fetchAPI(`/polls/${pollId}/lock`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ locked: newStatus })
+    });
+
+    if (result) {
+        showPopup(`Poll ${statusLabel} successfully!`, 'Success', 'success', () => {
+            loadAdminPolls();
+        });
+    }
+}
+
+function confirmDeletePoll(pollId, pollTitle) {
+    const message = `Are you sure you want to delete the poll "${pollTitle}"? This action cannot be undone.`;
+
+    // Create a custom popup for confirmation
+    const popupContainer = document.getElementById('popup-container');
+    const popupTitle = document.getElementById('popup-title');
+    const popupMessage = document.getElementById('popup-message');
+    const popup = popupContainer.querySelector('.popup');
+    const popupFooter = popup.querySelector('.popup-footer');
+
+    // Save original footer content
+    const originalFooter = popupFooter.innerHTML;
+
+    // Set content
+    popupTitle.textContent = 'Confirm Deletion';
+    popupMessage.textContent = message;
+
+    // Change footer to include cancel and confirm buttons
+    popupFooter.innerHTML = `
+        <button id="popup-cancel" class="btn-secondary">Cancel</button>
+        <button id="popup-confirm" class="btn-danger">Delete</button>
+    `;
+
+    // Add class for styling
+    popup.classList.add('confirmation');
+
+    // Show the popup
+    popupContainer.classList.remove('hidden');
+    setTimeout(() => {
+        popupContainer.classList.add('active');
+    }, 10);
+
+    // Set up close handlers
+    const closePopup = () => {
+        popupContainer.classList.remove('active');
+        setTimeout(() => {
+            popupContainer.classList.add('hidden');
+
+            // Restore original footer
+            popupFooter.innerHTML = originalFooter;
+
+            // Remove confirmation class
+            popup.classList.remove('confirmation');
+        }, 300);
+    };
+
+    document.getElementById('popup-close').onclick = closePopup;
+    document.getElementById('popup-cancel').onclick = closePopup;
+
+    // Set up confirm handler
+    document.getElementById('popup-confirm').onclick = async () => {
+        closePopup();
+        await deletePoll(pollId);
+    };
+
+    // Close when clicking outside
+    popupContainer.addEventListener('click', (e) => {
+        if (e.target === popupContainer) {
+            closePopup();
+        }
+    });
+}
+
+async function deletePoll(pollId) {
+    loading.classList.remove('hidden');
+
+    const result = await fetchAPI(`/polls/${pollId}`, {
+        method: 'DELETE'
+    });
+
+    if (result) {
+        showPopup('Poll deleted successfully!', 'Success', 'success', () => {
+            loadAdminPolls();
+        });
+    }
+}
+
 // Form Handling Functions
 async function handleCreatePoll(e) {
     e.preventDefault();
@@ -337,6 +923,7 @@ async function handleCreatePoll(e) {
 
     if (options.length < 2) {
         showPopup('Please provide at least 2 options.', 'Error', 'error');
+        return;
     }
 
     const pollData = {
@@ -374,6 +961,7 @@ async function handleSubmitVote() {
     // Validate email
     if (!email || !isValidEmail(email)) {
         showPopup('Please enter a valid email address.', 'Error', 'error');
+        return;
     }
 
     // Collect the rankings from all options that have a rank selected
@@ -397,7 +985,8 @@ async function handleSubmitVote() {
 
     // Validate that at least one option is ranked
     if (rankings.length === 0) {
-        showPopup('Please enter a valid email address.', 'Error', 'error');
+        showPopup('Please rank at least one option.', 'Error', 'error');
+        return;
     }
 
     // Create the vote data object in the format expected by your backend
@@ -469,6 +1058,7 @@ function removeOptionInput(optionElement) {
     // Prevent removing if we only have 2 options left
     if (optionInputs.length <= 2) {
         showPopup('A poll must have at least 2 options.', 'Information', 'info');
+        return;
     }
 
     optionElement.remove();

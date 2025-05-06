@@ -11,6 +11,7 @@
         <nav>
             <a href="#" class="nav-link" data-page="polls">Home</a>
             <a href="#" class="nav-link" data-page="create-poll">Create Poll</a>
+            <a href="#" class="nav-link" data-page="admin-login">Admin</a>
         </nav>
         <h1>Ranked Choice Voting</h1>
     </header>
@@ -59,6 +60,9 @@
         <section id="poll-detail-page" class="page hidden">
             <h2 id="poll-detail-title"></h2>
             <p id="poll-detail-description"></p>
+            <div id="poll-status-indicator" class="hidden">
+                <span class="status-badge locked-badge">Locked</span>
+            </div>
             <div class="button-group">
                 <button id="vote-button" class="btn-primary">Vote</button>
                 <button id="results-button" class="btn-secondary">Results</button>
@@ -93,6 +97,73 @@
                 </div>
             </div>
             <button id="back-to-poll" class="btn-secondary">Back to Poll</button>
+        </section>
+
+        <!-- Admin Login View -->
+        <section id="admin-login-page" class="page hidden">
+            <h2>Admin Login</h2>
+            <form id="admin-login-form">
+                <div class="form-group">
+                    <label for="admin-username">Username</label>
+                    <input type="text" id="admin-username" required>
+                </div>
+                <button type="submit" class="btn-primary">Login</button>
+            </form>
+        </section>
+
+        <!-- Admin Dashboard View -->
+        <section id="admin-dashboard-page" class="page hidden">
+            <h2>Admin Dashboard</h2>
+            <div class="admin-tabs">
+                <button class="admin-tab-btn active" data-tab="manage-polls">Manage Polls</button>
+                <button class="admin-tab-btn" data-tab="view-voters">View Voters</button>
+            </div>
+
+            <div id="manage-polls-tab" class="admin-tab-content">
+                <h3>Manage Polls</h3>
+                <div id="admin-polls-list"></div>
+            </div>
+
+            <div id="view-voters-tab" class="admin-tab-content hidden">
+                <h3>View Voters</h3>
+                <div class="form-group">
+                    <label for="select-poll-for-voters">Select Poll</label>
+                    <select id="select-poll-for-voters"></select>
+                </div>
+                <div id="voters-list"></div>
+            </div>
+        </section>
+
+        <!-- Edit Poll View -->
+        <section id="edit-poll-page" class="page hidden">
+            <h2>Edit Poll</h2>
+            <form id="edit-poll-form">
+                <input type="hidden" id="edit-poll-id">
+                <div class="form-group">
+                    <label for="edit-poll-title">Poll Title</label>
+                    <input type="text" id="edit-poll-title" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-poll-description">Description (Optional)</label>
+                    <textarea id="edit-poll-description"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Options</label>
+                    <div id="edit-options-container"></div>
+                    <button type="button" id="edit-add-option">+ Add Option</button>
+                </div>
+                <div class="form-group">
+                    <label for="poll-status">Poll Status</label>
+                    <select id="poll-status">
+                        <option value="open">Open</option>
+                        <option value="locked">Locked</option>
+                    </select>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                    <button type="button" id="cancel-edit" class="btn-secondary">Cancel</button>
+                </div>
+            </form>
         </section>
 
         <div id="popup-container" class="popup-container hidden">

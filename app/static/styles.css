@@ -116,6 +116,7 @@ label {
 
 input[type="text"],
 input[type="email"],
+input[type="password"],
 textarea {
     width: 100%;
     padding: 10px;
@@ -513,4 +514,144 @@ textarea {
 
 .popup {
     animation: popupFadeIn 0.3s forwards;
+}
+
+/* Admin Styles */
+.admin-tabs {
+    display: flex;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.admin-tab-btn {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-right: 10px;
+    cursor: pointer;
+}
+
+.admin-tab-btn.active {
+    border-bottom: 3px solid var(--primary-color);
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.admin-tab-content {
+    margin-top: 20px;
+}
+
+.admin-poll-card {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+    background-color: white;
+}
+
+.admin-poll-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.admin-poll-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin: 0;
+}
+
+.admin-poll-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.admin-action-btn {
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.admin-action-btn.edit {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+.admin-action-btn.delete {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.admin-action-btn.lock {
+    background-color: #f0a500;
+    color: white;
+}
+
+.admin-action-btn.unlock {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.admin-action-btn.view-voters {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.voters-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.voters-table th, .voters-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.voters-table th {
+    background-color: #f5f7fa;
+    font-weight: bold;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.locked-badge {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.admin-confirmation-dialog {
+    text-align: center;
+}
+
+.admin-confirmation-dialog .button-group {
+    margin-top: 20px;
+    justify-content: center;
+}
+
+/* Edit Poll Specific */
+#edit-options-container {
+    margin-bottom: 15px;
+}
+
+.edit-option-input {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.edit-option-input input {
+    flex: 1;
+    margin-right: 10px;
 }
