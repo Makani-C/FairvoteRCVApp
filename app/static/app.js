@@ -815,9 +815,7 @@ async function handleEditPoll(e) {
     });
 
     if (result) {
-        showPopup('Poll updated successfully!', 'Success', 'success', () => {
-            navigateTo('admin-dashboard');
-        });
+        navigateTo('admin-dashboard');
     }
 }
 
@@ -913,9 +911,7 @@ async function deletePoll(pollId) {
     });
 
     if (result) {
-        showPopup('Poll deleted successfully!', 'Success', 'success', () => {
-            loadAdminPolls();
-        });
+        loadAdminPolls();
     }
 }
 
@@ -953,10 +949,8 @@ async function handleCreatePoll(e) {
     });
 
     if (result) {
-       showPopup('Poll created successfully!', 'Success', 'success', () => {
-            document.getElementById('create-poll-form').reset();
-            navigateTo('admin-dashboard');
-        });
+        document.getElementById('create-poll-form').reset();
+        navigateTo('admin-dashboard');
     }
 }
 
