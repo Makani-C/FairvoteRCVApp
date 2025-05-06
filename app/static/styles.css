@@ -273,3 +273,99 @@ textarea {
     font-style: italic;
     color: #666;
 }
+
+/* Improved Numeric Ranking Styles */
+.numeric-ranking-container {
+    width: 100%;
+    margin-top: 20px;
+}
+
+.option-rank-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 12px 15px;
+    background-color: #f5f7fa;
+    border-radius: 6px;
+    border: 1px solid #dbe1e8;
+    transition: all 0.2s ease;
+}
+
+.option-rank-row:hover {
+    background-color: #eef2f7;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.option-text {
+    flex: 1;
+    font-weight: 500;
+    padding-right: 15px;
+    font-size: 16px;
+    color: #2c3e50;
+}
+
+.rank-numbers {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.rank-button {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid #cbd5e0;
+    background-color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    color: #4a5568;
+}
+
+.rank-button:hover {
+    background-color: #edf2f7;
+    border-color: #a0aec0;
+    transform: translateY(-2px);
+}
+
+/* Make the selected state more prominent */
+.rank-button.selected {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: 0 1px 3px rgba(74, 111, 165, 0.5);
+    transform: scale(1.1);
+}
+
+/* Add a custom animation for selection */
+@keyframes selectedPulse {
+    0% { transform: scale(1.1); }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1.1); }
+}
+
+.rank-button.selected {
+    animation: selectedPulse 1s infinite;
+}
+
+/* Make sure the hidden class properly hides elements */
+.hidden {
+    display: none !important;
+}
+
+/* Define CSS variables if they might be missing */
+:root {
+    --primary-color: #4a6fa5;
+    --secondary-color: #5d95c9;
+    --accent-color: #f0a500;
+    --background-color: #f4f7fb;
+    --text-color: #333;
+    --border-color: #ddd;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+}

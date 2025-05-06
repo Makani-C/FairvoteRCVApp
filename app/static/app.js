@@ -189,23 +189,94 @@ async function loadVotingForm(id) {
         document.getElementById('voting-poll-description').textContent =
             currentPoll.description || 'No description provided.';
 
-        const sortableOptions = document.getElementById('sortable-options');
-        sortableOptions.innerHTML = '';
+        // Clear any existing options
+        const optionsContainer = document.getElementById('numeric-ranking-options');
+        optionsContainer.innerHTML = '';
 
-        currentPoll.options.forEach((option, index) => {
-            const li = document.createElement('li');
-            li.className = 'ranking-item';
-            li.setAttribute('data-option-id', option.id);
-            li.innerHTML = `
-                <div class="ranking-number">${index + 1}</div>
-                <div class="ranking-text">${escapeHTML(option.text)}</div>
-            `;
-            sortableOptions.appendChild(li);
+        // Create the ranking interface for each option
+        currentPoll.options.forEach((option) => {
+            const optionRow = document.createElement('div');
+            optionRow.className = 'option-rank-row';
+
+            // Store the option ID correctly
+            // Depending on your API, option might be an object with id and text properties
+            // or it might be just a string. Let's handle both cases:
+            if (typeof option === 'object' && option.id) {
+                optionRow.dataset.optionId = option.id;
+                optionRow.dataset.optionText = option.text;
+            } else {
+                optionRow.dataset.optionId = option;
+                optionRow.dataset.optionText = option;
+            }
+
+            // Create the option text
+            const optionText = document.createElement('div');
+            optionText.className = 'option-text';
+            // Display the option text properly
+            optionText.textContent = typeof option === 'object' ? option.text : option;
+            optionRow.appendChild(optionText);
+
+            // Create the ranking numbers container
+            const rankNumbers = document.createElement('div');
+            rankNumbers.className = 'rank-numbers';
+
+            // Create buttons for each possible rank
+            for (let i = 1; i <= currentPoll.options.length; i++) {
+                const rankButton = document.createElement('button');
+                rankButton.type = 'button';
+                rankButton.className = 'rank-button';
+                rankButton.textContent = i;
+                rankButton.dataset.rank = i;
+
+                // When a rank button is clicked
+                rankButton.addEventListener('click', function() {
+                    const wasSelected = this.classList.contains('selected');
+
+                    // If this button was already selected, unselect it
+                    if (wasSelected) {
+                        this.classList.remove('selected');
+                    } else {
+                        // First, remove the selected rank from all other options to prevent duplicates
+                        const allOptionRows = document.querySelectorAll('.option-rank-row');
+                        const clickedRank = parseInt(this.dataset.rank);
+
+                        // Unselect this rank from any other option
+                        allOptionRows.forEach(row => {
+                            if (row !== optionRow) {
+                                const buttonWithSameRank = row.querySelector(`.rank-button[data-rank="${clickedRank}"]`);
+                                if (buttonWithSameRank && buttonWithSameRank.classList.contains('selected')) {
+                                    buttonWithSameRank.classList.remove('selected');
+                                }
+                            }
+                        });
+
+                        // Unselect any other rank that might be selected for this option
+                        optionRow.querySelectorAll('.rank-button.selected').forEach(btn => {
+                            if (btn !== this) {
+                                btn.classList.remove('selected');
+                            }
+                        });
+
+                        // Select this button
+                        this.classList.add('selected');
+                    }
+                });
+
+                rankNumbers.appendChild(rankButton);
+            }
+
+            optionRow.appendChild(rankNumbers);
+            optionsContainer.appendChild(optionRow);
         });
 
-        // Make options sortable (drag-and-drop)
-        makeOptionsSortable();
+        // Set up the form submission
+        document.getElementById('voting-form').onsubmit = function(e) {
+            e.preventDefault();
+            handleSubmitVote();
+        };
     }
+
+    loading.classList.add('hidden');
 }
 
 async function loadResults(id) {
@@ -265,22 +336,57 @@ async function handleCreatePoll(e) {
     }
 }
 
-async function handleSubmitVote(e) {
-    e.preventDefault();
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
 
+async function handleSubmitVote() {
     const email = document.getElementById('voter-email').value;
-    const rankingItems = document.querySelectorAll('.ranking-item');
 
-    const rankings = {};
-    rankingItems.forEach((item, index) => {
-        const optionId = item.getAttribute('data-option-id');
-        rankings[optionId] = index + 1;
+    // Validate email
+    if (!email || !isValidEmail(email)) {
+        alert('Please enter a valid email address.');
+        return;
+    }
+
+    // Collect the rankings from all options that have a rank selected
+    const rankings = [];
+    const optionRows = document.querySelectorAll('.option-rank-row');
+
+    optionRows.forEach(row => {
+        const optionId = row.dataset.optionId;
+        const selectedRankBtn = row.querySelector('.rank-button.selected');
+
+        // Only include options that have been ranked (have a selected rank button)
+        if (selectedRankBtn) {
+            const rank = parseInt(selectedRankBtn.dataset.rank);
+            rankings.push({
+                option: optionId,
+                rank: rank
+            });
+        }
+        // Options without a selected rank button are not included
     });
 
+    // Validate that at least one option is ranked
+    if (rankings.length === 0) {
+        alert('Please rank at least one option.');
+        return;
+    }
+
+    // Create the vote data object in the format expected by your backend
     const voteData = {
         email,
-        rankings
+        poll_id: currentPollId,
+        rankings: {}
     };
+
+    // Convert the rankings array to the format expected by your API
+    rankings.forEach(item => {
+        // Here we assume your backend expects a mapping of option IDs to rank values
+        voteData.rankings[item.option] = item.rank;
+    });
 
     loading.classList.remove('hidden');
 
