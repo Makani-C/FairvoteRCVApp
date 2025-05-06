@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, func
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, func
 from sqlalchemy.orm import relationship
+import json
 
 from database.session import Base
 
@@ -34,8 +35,18 @@ class Vote(Base):
     id = Column(Integer, primary_key=True, index=True)
     poll_id = Column(Integer, ForeignKey("polls.id"))
     email = Column(String, nullable=False)
-    rankings = Column(JSON, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
+
+    _rankings = Column("rankings", Text, nullable=False)
 
     # Relationships
     poll = relationship("Poll", back_populates="votes")
+
+    # Property methods to handle JSON serialization/deserialization
+    @property
+    def rankings(self):
+        return json.loads(self._rankings)
+
+    @rankings.setter
+    def rankings(self, value):
+        self._rankings = json.dumps(value)
