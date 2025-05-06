@@ -958,7 +958,7 @@ async function handleCreatePoll(e) {
     if (result) {
        showPopup('Poll created successfully!', 'Success', 'success', () => {
             document.getElementById('create-poll-form').reset();
-            navigateTo('poll-detail', result.id);
+            navigateTo('admin-dashboard');
         });
     }
 }
@@ -1390,3 +1390,11 @@ window.alert = function(message) {
         showPopup(message, 'Alert', 'info');
     }
 };
+
+document.getElementById('create-poll-btn').addEventListener('click', () => {
+    navigateTo('create-poll');
+});
+
+document.getElementById('cancel-create').addEventListener('click', () => {
+    navigateTo('admin-dashboard');
+});

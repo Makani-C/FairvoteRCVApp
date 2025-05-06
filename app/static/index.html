@@ -8,10 +8,10 @@
 </head>
 <body>
     <header>
-        <h1>Ranked Choice Voting</h1>
+        <h1>Ranked Choice Portal</h1>
+        <h3>by FairVote WA</h3>
         <nav>
-            <a href="#" class="nav-link" data-page="polls">Home</a>
-            <a href="#" class="nav-link" data-page="create-poll">Create Poll</a>
+            <a href="#" class="nav-link" data-page="polls">Polls</a>
             <a href="#" class="nav-link" data-page="admin-login">Admin</a>
         </nav>
     </header>
@@ -52,7 +52,10 @@
                     </div>
                     <button type="button" id="add-option">+ Add Option</button>
                 </div>
-                <button type="submit" class="btn-primary">Create Poll</button>
+                <div class="button-group">
+                    <button type="submit" class="btn-primary">Create Poll</button>
+                    <button type="button" id="cancel-create" class="btn-secondary">Cancel</button>
+                </div>
             </form>
         </section>
 
@@ -121,6 +124,9 @@
 
             <div id="manage-polls-tab" class="admin-tab-content">
                 <h3>Manage Polls</h3>
+                <div class="admin-actions">
+                    <button id="create-poll-btn" class="btn-primary">Create New Poll</button>
+                </div>
                 <div id="admin-polls-list"></div>
             </div>
 
