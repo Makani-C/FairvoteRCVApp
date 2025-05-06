@@ -473,14 +473,27 @@ async function handleAdminLogin(e) {
 
     loading.classList.remove('hidden');
 
-    isAdmin = true;
+    // Simple authentication - in a real app, this would verify credentials
+    if (username && username.trim() !== '') {
+        // Set admin status and store in localStorage
+        adminToken = 'demo-token-' + Date.now(); // Simple token for demo
+        localStorage.setItem('adminToken', adminToken);
+        isAdmin = true;
 
-    showPopup('Login successful!', 'Success', 'success', () => {
-        navigateTo('admin-dashboard');
-    });
+        // Hide loading and show success message
+        loading.classList.add('hidden');
 
-    // Clear the form
-    document.getElementById('admin-login-form').reset();
+        showPopup('Login successful!', 'Success', 'success', () => {
+            navigateTo('admin-dashboard');
+        });
+
+        // Clear the form
+        document.getElementById('admin-login-form').reset();
+    } else {
+        // Hide loading and show error if username is empty
+        loading.classList.add('hidden');
+        showPopup('Please enter a username', 'Error', 'error');
+    }
 
     // TODO - require password
     // const result = await fetchAPI('/admin/login', {
