@@ -480,15 +480,12 @@ async function handleAdminLogin(e) {
         localStorage.setItem('adminToken', adminToken);
         isAdmin = true;
 
-        // Hide loading and show success message
+        // Hide and clear the form
         loading.classList.add('hidden');
-
-        showPopup('Login successful!', 'Success', 'success', () => {
-            navigateTo('admin-dashboard');
-        });
-
-        // Clear the form
         document.getElementById('admin-login-form').reset();
+
+        navigateTo('admin-dashboard');
+
     } else {
         // Hide loading and show error if username is empty
         loading.classList.add('hidden');
