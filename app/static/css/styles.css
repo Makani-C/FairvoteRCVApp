@@ -1,0 +1,54 @@
+/* General Styles */
+body {
+    background-color: #f8f9fa;
+}
+
+/* Voting Form Styles */
+#sortable-options .list-group-item {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#sortable-options .list-group-item:hover {
+    background-color: #f8f9fa;
+}
+
+.drag-handle {
+    cursor: grab;
+    color: #6c757d;
+}
+
+/* Results Page Styles */
+.elimination-list li {
+    margin-bottom: 0.5rem;
+}
+
+.round-card {
+    margin-bottom: 1.5rem;
+}
+
+.round-title {
+    background-color: #f8f9fa;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.progress {
+    height: 2rem;
+}
+
+.option-result {
+    margin-bottom: 0.75rem;
+}
+
+.eliminated {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+@media (max-width: 767.98px) {
+    .chart-container {
+        height: 300px !important;
+    }
+}
