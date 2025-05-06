@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ranked Choice Voting</title>
+    <link rel="stylesheet" href="static/styles.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="#" class="nav-link" data-page="polls">Home</a>
+            <a href="#" class="nav-link" data-page="create-poll">Create Poll</a>
+        </nav>
+        <h1>Ranked Choice Voting</h1>
+    </header>
+
+    <main id="app-container">
+        <!-- Content will be dynamically loaded here -->
+        <div id="loading" class="hidden">Loading...</div>
+
+        <!-- Poll List View -->
+        <section id="polls-page" class="page">
+            <h2>Available Polls</h2>
+            <div id="polls-list"></div>
+        </section>
+
+        <!-- Create Poll View -->
+        <section id="create-poll-page" class="page hidden">
+            <h2>Create New Poll</h2>
+            <form id="create-poll-form">
+                <div class="form-group">
+                    <label for="poll-title">Poll Title</label>
+                    <input type="text" id="poll-title" required>
+                </div>
+                <div class="form-group">
+                    <label for="poll-description">Description (Optional)</label>
+                    <textarea id="poll-description"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Options</label>
+                    <div id="options-container">
+                        <div class="option-input">
+                            <input type="text" class="poll-option" required>
+                            <button type="button" class="remove-option hidden">×</button>
+                        </div>
+                        <div class="option-input">
+                            <input type="text" class="poll-option" required>
+                            <button type="button" class="remove-option hidden">×</button>
+                        </div>
+                    </div>
+                    <button type="button" id="add-option">+ Add Option</button>
+                </div>
+                <button type="submit" class="btn-primary">Create Poll</button>
+            </form>
+        </section>
+
+        <!-- Poll Detail View -->
+        <section id="poll-detail-page" class="page hidden">
+            <h2 id="poll-detail-title"></h2>
+            <p id="poll-detail-description"></p>
+            <div class="button-group">
+                <button id="vote-button" class="btn-primary">Vote</button>
+                <button id="results-button" class="btn-secondary">Results</button>
+            </div>
+        </section>
+
+        <!-- Voting Form View -->
+        <section id="voting-page" class="page hidden">
+            <h2 id="voting-poll-title"></h2>
+            <p id="voting-poll-description"></p>
+            <form id="voting-form">
+                <div class="form-group">
+                    <label for="voter-email">Your Email</label>
+                    <input type="email" id="voter-email" required>
+                </div>
+                <div class="form-group">
+                    <label>Rank the options (drag to reorder)</label>
+                    <ul id="sortable-options" class="ranking-list"></ul>
+                </div>
+                <button type="submit" class="btn-primary">Submit Vote</button>
+            </form>
+        </section>
+
+        <!-- Results View -->
+        <section id="results-page" class="page hidden">
+            <h2 id="results-poll-title"></h2>
+            <div class="results-visualization">
+                <div class="rounds-container">
+                    <h3>Round 1</h3>
+                    <div id="round-1-results" class="round-results"></div>
+                    <div id="additional-rounds"></div>
+                </div>
+            </div>
+            <button id="back-to-poll" class="btn-secondary">Back to Poll</button>
+        </section>
+    </main>
+
+    <script src="static/app.js"></script>
+</body>
+</html>

@@ -3,8 +3,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from typing import List
 
-from database import get_db
-from models import Vote, Poll, Option
+from database.session import get_db
+from database.models import Vote, Poll, Option
 from schemas import Vote as VoteSchema, VoteCreate
 
 router = APIRouter(
@@ -24,13 +24,16 @@ def create_vote(poll_id: int, vote: VoteCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Poll not found")
 
     # Check if options exist and belong to the poll
-    option_ids = list(vote.rankings.keys())
+    option_ids = list(map(int, vote.rankings.keys()))
     poll_options = db.query(Option).filter(Option.poll_id == poll_id).all()
     poll_option_ids = [option.id for option in poll_options]
 
-    for option_id in option_ids:
-        if option_id not in poll_option_ids:
-            raise HTTPException(status_code=400, detail=f"Option {option_id} not found in poll {poll_id}")
+    invalid_options = [opt_id for opt_id in option_ids if opt_id not in poll_option_ids]
+    if invalid_options:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Options {invalid_options} not found in poll {poll_id}"
+        )
 
     # Check if user already voted
     existing_vote = db.query(Vote).filter(

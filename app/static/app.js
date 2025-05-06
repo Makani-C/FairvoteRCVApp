@@ -1,0 +1,552 @@
+// Configuration
+const API_BASE_URL = "http://localhost:8000";
+
+// DOM elements
+const pages = document.querySelectorAll('.page');
+const navLinks = document.querySelectorAll('.nav-link');
+const loading = document.getElementById('loading');
+const pollsList = document.getElementById('polls-list');
+
+// Current state
+let currentPollId = null;
+let currentPoll = null;
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', () => {
+    // Set up navigation
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetPage = link.getAttribute('data-page');
+            navigateTo(targetPage);
+        });
+    });
+
+    // Set up create poll form
+    const createPollForm = document.getElementById('create-poll-form');
+    createPollForm.addEventListener('submit', handleCreatePoll);
+
+    // Set up option management
+    const addOptionBtn = document.getElementById('add-option');
+    addOptionBtn.addEventListener('click', addOptionInput);
+
+    // Set up event delegation for remove option buttons
+    document.getElementById('options-container').addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-option')) {
+            removeOptionInput(e.target.parentElement);
+        }
+    });
+
+    // Set up poll detail page buttons
+    document.getElementById('vote-button').addEventListener('click', () => {
+        navigateTo('voting', currentPollId);
+    });
+
+    document.getElementById('results-button').addEventListener('click', () => {
+        navigateTo('results', currentPollId);
+    });
+
+    // Set up voting form submission
+    document.getElementById('voting-form').addEventListener('submit', handleSubmitVote);
+
+    // Set up results page back button
+    document.getElementById('back-to-poll').addEventListener('click', () => {
+        navigateTo('poll-detail', currentPollId);
+    });
+
+    // Initialize page based on URL hash or default to polls
+    const hash = window.location.hash.substring(1);
+    if (hash) {
+        const [page, id] = hash.split('/');
+        navigateTo(page, id);
+    } else {
+        navigateTo('polls');
+    }
+});
+
+// Navigation function
+function navigateTo(page, id = null) {
+    // Hide all pages
+    pages.forEach(p => p.classList.add('hidden'));
+
+    // Update hash for back button support
+    if (id) {
+        window.location.hash = `${page}/${id}`;
+    } else {
+        window.location.hash = page;
+    }
+
+    // Show loading indicator
+    loading.classList.remove('hidden');
+
+    // Load appropriate page
+    switch(page) {
+        case 'polls':
+            loadPolls();
+            document.getElementById('polls-page').classList.remove('hidden');
+            break;
+
+        case 'create-poll':
+            document.getElementById('create-poll-page').classList.remove('hidden');
+            loading.classList.add('hidden');
+            break;
+
+        case 'poll-detail':
+            loadPollDetail(id);
+            document.getElementById('poll-detail-page').classList.remove('hidden');
+            break;
+
+        case 'voting':
+            loadVotingForm(id);
+            document.getElementById('voting-page').classList.remove('hidden');
+            break;
+
+        case 'results':
+            loadResults(id);
+            document.getElementById('results-page').classList.remove('hidden');
+            break;
+
+        default:
+            console.error('Unknown page:', page);
+            navigateTo('polls');
+    }
+}
+
+// API Functions
+async function fetchAPI(endpoint, options = {}) {
+    try {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+
+        // Check if response is empty (for DELETE requests)
+        if (response.status === 204) {
+            return true;
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('API request failed:', error);
+        alert(`API request failed: ${error.message}`);
+        return null;
+    } finally {
+        loading.classList.add('hidden');
+    }
+}
+
+// Page Loading Functions
+async function loadPolls() {
+    const polls = await fetchAPI('/polls/');
+
+    if (polls) {
+        pollsList.innerHTML = '';
+
+        if (polls.length === 0) {
+            pollsList.innerHTML = '<p>No polls available. Create your first poll!</p>';
+            return;
+        }
+
+        polls.forEach(poll => {
+            const pollCard = document.createElement('div');
+            pollCard.className = 'poll-card';
+            pollCard.innerHTML = `
+                <h3>${escapeHTML(poll.title)}</h3>
+                <p>${escapeHTML(poll.description || 'No description')}</p>
+                <p><small>Created: ${new Date(poll.created_at).toLocaleDateString()}</small></p>
+            `;
+
+            pollCard.addEventListener('click', () => {
+                navigateTo('poll-detail', poll.id);
+            });
+
+            pollsList.appendChild(pollCard);
+        });
+    }
+}
+
+async function loadPollDetail(id) {
+    currentPollId = id;
+    currentPoll = await fetchAPI(`/polls/${id}`);
+
+    if (currentPoll) {
+        document.getElementById('poll-detail-title').textContent = currentPoll.title;
+        document.getElementById('poll-detail-description').textContent =
+            currentPoll.description || 'No description provided.';
+    }
+}
+
+async function loadVotingForm(id) {
+    currentPollId = id;
+
+    if (!currentPoll || currentPoll.id != id) {
+        currentPoll = await fetchAPI(`/polls/${id}`);
+    }
+
+    if (currentPoll) {
+        document.getElementById('voting-poll-title').textContent = currentPoll.title;
+        document.getElementById('voting-poll-description').textContent =
+            currentPoll.description || 'No description provided.';
+
+        const sortableOptions = document.getElementById('sortable-options');
+        sortableOptions.innerHTML = '';
+
+        currentPoll.options.forEach((option, index) => {
+            const li = document.createElement('li');
+            li.className = 'ranking-item';
+            li.setAttribute('data-option-id', option.id);
+            li.innerHTML = `
+                <div class="ranking-number">${index + 1}</div>
+                <div class="ranking-text">${escapeHTML(option.text)}</div>
+            `;
+            sortableOptions.appendChild(li);
+        });
+
+        // Make options sortable (drag-and-drop)
+        makeOptionsSortable();
+    }
+}
+
+async function loadResults(id) {
+    currentPollId = id;
+
+    if (!currentPoll || currentPoll.id != id) {
+        currentPoll = await fetchAPI(`/polls/${id}`);
+    }
+
+    const resultsData = await fetchAPI(`/results/api/poll/${id}`);
+
+    if (currentPoll && resultsData) {
+        document.getElementById('results-poll-title').textContent = currentPoll.title;
+
+        // Render the results visualization
+        renderResultsVisualization(resultsData);
+    }
+}
+
+// Form Handling Functions
+async function handleCreatePoll(e) {
+    e.preventDefault();
+
+    const title = document.getElementById('poll-title').value;
+    const description = document.getElementById('poll-description').value;
+    const optionInputs = document.querySelectorAll('.poll-option');
+
+    const options = Array.from(optionInputs)
+        .map(input => input.value.trim())
+        .filter(text => text !== '');
+
+    if (options.length < 2) {
+        alert('Please provide at least 2 options.');
+        return;
+    }
+
+    const pollData = {
+        title,
+        description,
+        options
+    };
+
+    loading.classList.remove('hidden');
+
+    const result = await fetchAPI('/polls/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(pollData)
+    });
+
+    if (result) {
+        alert('Poll created successfully!');
+        document.getElementById('create-poll-form').reset();
+        navigateTo('poll-detail', result.id);
+    }
+}
+
+async function handleSubmitVote(e) {
+    e.preventDefault();
+
+    const email = document.getElementById('voter-email').value;
+    const rankingItems = document.querySelectorAll('.ranking-item');
+
+    const rankings = {};
+    rankingItems.forEach((item, index) => {
+        const optionId = item.getAttribute('data-option-id');
+        rankings[optionId] = index + 1;
+    });
+
+    const voteData = {
+        email,
+        rankings
+    };
+
+    loading.classList.remove('hidden');
+
+    const result = await fetchAPI(`/votes/?poll_id=${currentPollId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(voteData)
+    });
+
+    if (result) {
+        alert('Your vote has been recorded!');
+        navigateTo('results', currentPollId);
+    }
+}
+
+// Helper Functions
+function escapeHTML(str) {
+    if (!str) return '';
+    return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function addOptionInput() {
+    const optionsContainer = document.getElementById('options-container');
+    const optionInputs = optionsContainer.querySelectorAll('.option-input');
+
+    // Show remove buttons if we're adding more than the minimum
+    if (optionInputs.length >= 2) {
+        optionInputs.forEach(input => {
+            input.querySelector('.remove-option').classList.remove('hidden');
+        });
+    }
+
+    const newOption = document.createElement('div');
+    newOption.className = 'option-input';
+    newOption.innerHTML = `
+        <input type="text" class="poll-option" required>
+        <button type="button" class="remove-option">×</button>
+    `;
+
+    optionsContainer.appendChild(newOption);
+}
+
+function removeOptionInput(optionElement) {
+    const optionsContainer = document.getElementById('options-container');
+    const optionInputs = optionsContainer.querySelectorAll('.option-input');
+
+    // Prevent removing if we only have 2 options left
+    if (optionInputs.length <= 2) {
+        alert('A poll must have at least 2 options.');
+        return;
+    }
+
+    optionElement.remove();
+
+    // Hide remove buttons if we're down to the minimum
+    const remainingInputs = optionsContainer.querySelectorAll('.option-input');
+    if (remainingInputs.length <= 2) {
+        remainingInputs.forEach(input => {
+            input.querySelector('.remove-option').classList.add('hidden');
+        });
+    }
+}
+
+function makeOptionsSortable() {
+    const sortableList = document.getElementById('sortable-options');
+    const items = sortableList.querySelectorAll('.ranking-item');
+
+    let draggedItem = null;
+
+    items.forEach(item => {
+        // Make item draggable
+        item.setAttribute('draggable', true);
+
+        item.addEventListener('dragstart', function() {
+            draggedItem = this;
+            setTimeout(() => this.classList.add('dragging'), 0);
+        });
+
+        item.addEventListener('dragend', function() {
+            this.classList.remove('dragging');
+            draggedItem = null;
+
+            // Update the ranking numbers
+            updateRankingNumbers();
+        });
+
+        item.addEventListener('dragover', function(e) {
+            e.preventDefault();
+        });
+
+        item.addEventListener('dragenter', function(e) {
+            e.preventDefault();
+            this.classList.add('drag-over');
+        });
+
+        item.addEventListener('dragleave', function() {
+            this.classList.remove('drag-over');
+        });
+
+        item.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+
+            if (draggedItem !== this) {
+                // Determine whether to insert before or after based on the middle point
+                const rect = this.getBoundingClientRect();
+                const midpoint = rect.top + rect.height / 2;
+
+                if (e.clientY < midpoint) {
+                    sortableList.insertBefore(draggedItem, this);
+                } else {
+                    sortableList.insertBefore(draggedItem, this.nextSibling);
+                }
+            }
+        });
+    });
+}
+
+function updateRankingNumbers() {
+    const items = document.querySelectorAll('.ranking-item');
+    items.forEach((item, index) => {
+        const rankingNumber = item.querySelector('.ranking-number');
+        rankingNumber.textContent = index + 1;
+    });
+}
+
+/**
+ * Renders the results visualization for a ranked choice vote
+ * @param {Object} resultsData - The data from the API containing voting results
+ */
+function renderResultsVisualization(resultsData) {
+    if (!resultsData) {
+        console.error('No results data available');
+        return;
+    }
+
+    // Check if rounds is available
+    if (!resultsData.results || !resultsData.results.rounds) {
+        console.error('No rounds data in results');
+        return;
+    }
+
+    const rounds = resultsData.results.rounds;
+    const round1Results = document.getElementById('round-1-results');
+    const additionalRounds = document.getElementById('additional-rounds');
+
+    // Clear previous results
+    round1Results.innerHTML = '';
+    additionalRounds.innerHTML = '';
+
+    // Determine the maximum vote count for scaling
+    let maxVotes = 0;
+    rounds.forEach(round => {
+        if (round.counts) {
+            Object.values(round.counts).forEach(count => {
+                if (count > maxVotes) maxVotes = count;
+            });
+        }
+    });
+
+    // Add CSS for winner and eliminated styles if not already in the styles.css
+    if (!document.getElementById('rcv-result-styles')) {
+        const styleEl = document.createElement('style');
+        styleEl.id = 'rcv-result-styles';
+        styleEl.textContent = `
+            .result-bar-inner.eliminated {
+                background-color: var(--danger-color);
+                opacity: 0.8;
+            }
+            .result-bar-inner.winner {
+                background-color: var(--success-color);
+                font-weight: bold;
+            }
+        `;
+        document.head.appendChild(styleEl);
+    }
+
+    // Render Round 1
+    if (rounds.length > 0) {
+        const round1 = rounds[0];
+
+        if (!round1.counts) {
+            round1Results.innerHTML = '<p>No vote data available</p>';
+        } else {
+            Object.keys(round1.counts).forEach(optionText => {
+                const votes = round1.counts[optionText];
+                const percentage = maxVotes > 0 ? (votes / maxVotes) * 100 : 0;
+
+                const isEliminated = round1.eliminated === optionText;
+                const isWinner = round1.winner === optionText;
+
+                const resultBar = document.createElement('div');
+                resultBar.className = 'result-bar-container';
+
+                let barClass = 'result-bar-inner';
+                if (isEliminated) barClass += ' eliminated';
+                if (isWinner) barClass += ' winner';
+
+                resultBar.innerHTML = `
+                    <div class="result-bar-label">
+                        <span>${escapeHTML(optionText)}</span>
+                        <span>${votes} vote${votes !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="result-bar-outer">
+                        <div class="${barClass}" style="width: ${percentage}%;">
+                            ${votes}${isWinner ? ' (Winner)' : ''}${isEliminated ? ' (Eliminated)' : ''}
+                        </div>
+                    </div>
+                `;
+
+                round1Results.appendChild(resultBar);
+            });
+        }
+    }
+
+    // Render additional rounds
+    if (rounds.length > 1) {
+        for (let i = 1; i < rounds.length; i++) {
+            const round = rounds[i];
+            const roundDiv = document.createElement('div');
+            roundDiv.className = 'round-results';
+            roundDiv.innerHTML = `<h3>Round ${i + 1}</h3>`;
+
+            if (!round.counts) {
+                roundDiv.innerHTML += '<p>No vote data available for this round</p>';
+                additionalRounds.appendChild(roundDiv);
+                continue;
+            }
+
+            Object.keys(round.counts).forEach(optionText => {
+                const votes = round.counts[optionText];
+                const percentage = maxVotes > 0 ? (votes / maxVotes) * 100 : 0;
+
+                const isEliminated = round.eliminated === optionText;
+                const isWinner = round.winner === optionText;
+
+                const resultBar = document.createElement('div');
+                resultBar.className = 'result-bar-container';
+
+                let barClass = 'result-bar-inner';
+                if (isEliminated) barClass += ' eliminated';
+                if (isWinner) barClass += ' winner';
+
+                resultBar.innerHTML = `
+                    <div class="result-bar-label">
+                        <span>${escapeHTML(optionText)}</span>
+                        <span>${votes} vote${votes !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="result-bar-outer">
+                        <div class="${barClass}" style="width: ${percentage}%;">
+                            ${votes}${isWinner ? ' (Winner)' : ''}${isEliminated ? ' (Eliminated)' : ''}
+                        </div>
+                    </div>
+                `;
+
+                roundDiv.appendChild(resultBar);
+            });
+
+            additionalRounds.appendChild(roundDiv);
+        }
+    }
+}

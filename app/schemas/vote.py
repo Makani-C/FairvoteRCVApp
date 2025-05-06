@@ -1,5 +1,5 @@
-from typing import Dict, Optional
-from pydantic import BaseModel, EmailStr
+from typing import Dict
+from pydantic import BaseModel, validator
 from datetime import datetime
 
 class VoteCreate(BaseModel):
@@ -13,3 +13,13 @@ class Vote(VoteCreate):
 
     class Config:
         orm_mode = True
+
+    @validator('rankings')
+    def validate_rankings(cls, rankings):
+        if not rankings:
+            raise ValueError("At least one option must be ranked")
+
+        # Check for duplicate rankings
+        if len(set(rankings.values())) != len(rankings.values()):
+            raise ValueError("Each rank value must be unique")
+        return rankings

@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 
-from database import get_db
-from models import Poll, Option
+from database.session import get_db
+from database.models import Poll, Option
 from schemas import Poll as PollSchema, PollCreate
 
 router = APIRouter(
