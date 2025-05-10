@@ -75,15 +75,27 @@ def calculate_ranked_choice_results(votes: List[Vote], options: List[Option]) ->
                 winner = option_id
                 break
 
-        # No majority winner, determine which option to eliminate
         if winner is None:
+            # First eliminate all zero-vote options
+            zero_vote_options = [
+                option_id for option_id, count in round_result.vote_counts.items()
+                if count == 0
+            ]
+            vote_counts = round_result.vote_counts
+            for option_id in zero_vote_options:
+                remaining_option_ids.remove(option_id)
+                eliminated_option_ids.append(option_id)
+                vote_counts.pop(option_id)
+
             option_to_eliminate = _select_option_to_eliminate(round_result.vote_counts)
+
             if option_to_eliminate is None:
-                break  # Unable to determine an option to eliminate
+                break
 
             round_result.eliminated = option_to_eliminate
             remaining_option_ids.remove(option_to_eliminate)
             eliminated_option_ids.append(option_to_eliminate)
+
 
         rounds_results.append(round_result)
         round_num += 1
