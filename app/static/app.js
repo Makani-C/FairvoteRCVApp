@@ -609,6 +609,7 @@ async function loadVotersForPoll(pollId) {
                 <th>Email</th>
                 <th>Voted On</th>
                 <th>Rankings</th>
+                <th>Actions</th>
             </tr>
         `;
         table.appendChild(thead);
@@ -628,6 +629,9 @@ async function loadVotersForPoll(pollId) {
                 <td>${escapeHTML(vote.email)}</td>
                 <td>${new Date(vote.created_at).toLocaleString()}</td>
                 <td>${escapeHTML(rankingsStr)}</td>
+                <td>
+                    <button class="delete-vote-btn" data-vote-id="${vote.id}">Delete</button>
+                </td>
             `;
 
             tbody.appendChild(tr);
@@ -636,7 +640,91 @@ async function loadVotersForPoll(pollId) {
         table.appendChild(tbody);
         votersList.innerHTML = '';
         votersList.appendChild(table);
+
+        document.querySelectorAll('.delete-vote-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                confirmDeleteVote(btn.getAttribute('data-vote-id'), pollId);
+            });
+        });
     }
+}
+
+async function deleteVote(voteId, pollId) {
+    loading.classList.remove('hidden');
+
+    const result = await fetchAPI(`/votes/${voteId}`, {
+        method: 'DELETE'
+    });
+
+    if (result) {
+        showPopup('Vote deleted successfully!', 'Success', 'success', () => {
+            // Reload the voters list to reflect the deletion
+            loadVotersForPoll(pollId);
+        });
+    }
+}
+
+function confirmDeleteVote(voteId, pollId) {
+    const message = `Are you sure you want to delete this vote? This action cannot be undone.`;
+
+    // Create a custom popup for confirmation
+    const popupContainer = document.getElementById('popup-container');
+    const popupTitle = document.getElementById('popup-title');
+    const popupMessage = document.getElementById('popup-message');
+    const popup = popupContainer.querySelector('.popup');
+    const popupFooter = popup.querySelector('.popup-footer');
+
+    // Save original footer content
+    const originalFooter = popupFooter.innerHTML;
+
+    // Set content
+    popupTitle.textContent = 'Confirm Vote Deletion';
+    popupMessage.textContent = message;
+
+    // Change footer to include cancel and confirm buttons
+    popupFooter.innerHTML = `
+        <button id="popup-cancel" class="btn-secondary">Cancel</button>
+        <button id="popup-confirm" class="btn-danger">Delete</button>
+    `;
+
+    // Add class for styling
+    popup.classList.add('confirmation');
+
+    // Show the popup
+    popupContainer.classList.remove('hidden');
+    setTimeout(() => {
+        popupContainer.classList.add('active');
+    }, 10);
+
+    // Set up close handlers
+    const closePopup = () => {
+        popupContainer.classList.remove('active');
+        setTimeout(() => {
+            popupContainer.classList.add('hidden');
+
+            // Restore original footer
+            popupFooter.innerHTML = originalFooter;
+
+            // Remove confirmation class
+            popup.classList.remove('confirmation');
+        }, 300);
+    };
+
+    document.getElementById('popup-close').onclick = closePopup;
+    document.getElementById('popup-cancel').onclick = closePopup;
+
+    // Set up confirm handler
+    document.getElementById('popup-confirm').onclick = async () => {
+        closePopup();
+        await deleteVote(voteId, pollId);
+    };
+
+    // Close when clicking outside
+    popupContainer.addEventListener('click', (e) => {
+        if (e.target === popupContainer) {
+            closePopup();
+        }
+    });
 }
 
 async function togglePollLock(pollId, currentStatus) {
@@ -1166,13 +1254,7 @@ function showToast(message, type = 'info', duration = 3000) {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
 
-    // Determine icon based on type
-    let icon = '✓';
-    if (type === 'error') icon = '✕';
-    if (type === 'info') icon = 'ℹ';
-
     toast.innerHTML = `
-        <div class="toast-icon">${icon}</div>
         <div class="toast-message">${message}</div>
     `;
 

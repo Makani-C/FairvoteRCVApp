@@ -827,6 +827,20 @@ textarea {
   background-color: rgba(91, 118, 244, 0.05);
 }
 
+.delete-vote-btn {
+  background-color: var(--danger-color);
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.delete-vote-btn:hover {
+  background-color: #d32f2f;
+}
+
 /* Enhanced Popup Styles */
 .popup-container {
   position: fixed;
