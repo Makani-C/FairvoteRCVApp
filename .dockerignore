@@ -18,3 +18,5 @@
 # created by virtualenv automatically
 .venv/**/*
 fly.toml
+
+.DS_Store
