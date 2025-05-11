@@ -447,28 +447,37 @@ async function loadResults(id) {
 async function handleAdminLogin(e) {
     e.preventDefault();
 
-    const username = document.getElementById('admin-username').value;
 
     loading.classList.remove('hidden');
 
-    // Simple authentication - in a real app, this would verify credentials
-    if (username && username.trim() !== '') {
-        // Set admin status and store in localStorage
-        adminToken = 'demo-token-' + Date.now(); // Simple token for demo
-        localStorage.setItem('adminToken', adminToken);
-        isAdmin = true;
+    adminToken = 'demo-token-' + Date.now();
+    localStorage.setItem('adminToken', adminToken);
+    isAdmin = true;
 
-        // Hide and clear the form
-        loading.classList.add('hidden');
-        document.getElementById('admin-login-form').reset();
+    // Hide and clear the form
+    loading.classList.add('hidden');
+    document.getElementById('admin-login-form').reset();
 
-        navigateTo('admin-dashboard');
+    navigateTo('admin-dashboard');
 
-    } else {
-        // Hide loading and show error if username is empty
-        loading.classList.add('hidden');
-        showPopup('Please enter a username', 'Error', 'error');
-    }
+    // const username = document.getElementById('admin-username').value;
+
+    // if (username && username.trim() !== '') {
+    //     // Set admin status and store in localStorage
+    //     adminToken = 'demo-token-' + Date.now(); // Simple token for demo
+    //     localStorage.setItem('adminToken', adminToken);
+    //     isAdmin = true;
+
+    //     // Hide and clear the form
+    //     loading.classList.add('hidden');
+    //     document.getElementById('admin-login-form').reset();
+
+    //     navigateTo('admin-dashboard');
+    // } else {
+    //     // Hide loading and show error if username is empty
+    //     loading.classList.add('hidden');
+    //     showPopup('Please enter a username', 'Error', 'error');
+    // }
 
     // TODO - require password
     // const result = await fetchAPI('/admin/login', {
