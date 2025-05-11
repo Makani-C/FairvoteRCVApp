@@ -1,5 +1,5 @@
 // Configuration
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = window.location.origin;
 
 // DOM elements
 const pages = document.querySelectorAll('.page');
@@ -94,23 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Set up edit poll form
-    document.getElementById('edit-poll-form').addEventListener('submit', handleEditPoll);
-
-    document.getElementById('edit-add-option').addEventListener('click', addEditOptionInput);
-
-    // Set up cancel edit button
-    document.getElementById('cancel-edit').addEventListener('click', () => {
-        navigateTo('admin-dashboard');
-    });
-
-    // Set up edit options container for event delegation
-    document.getElementById('edit-options-container').addEventListener('click', (e) => {
-        if (e.target.classList.contains('remove-option')) {
-            removeEditOptionInput(e.target.parentElement);
-        }
-    });
-
     // Initialize page based on URL hash or default to polls
     const hash = window.location.hash.substring(1);
     if (hash) {
@@ -180,11 +163,6 @@ function navigateTo(page, id = null) {
             // Load admin dashboard content
             loadAdminPolls();
             document.getElementById('admin-dashboard-page').classList.remove('hidden');
-            break;
-
-        case 'edit-poll':
-            loadEditPollForm(id);
-            document.getElementById('edit-poll-page').classList.remove('hidden');
             break;
 
         default:
@@ -541,7 +519,6 @@ async function loadAdminPolls() {
                 <div class="admin-poll-header">
                     <h3 class="admin-poll-title">${escapeHTML(poll.title)}</h3>
                     <div class="admin-poll-actions">
-                        <button class="admin-action-btn edit" data-id="${poll.id}">Edit</button>
                         <button class="admin-action-btn ${poll.locked ? 'unlock' : 'lock'}" data-id="${poll.id}">
                             ${poll.locked ? 'Unlock' : 'Lock'}
                         </button>
@@ -558,11 +535,6 @@ async function loadAdminPolls() {
             `;
 
             // Add event listeners for the action buttons
-            pollCard.querySelector('.edit').addEventListener('click', (e) => {
-                e.stopPropagation();
-                navigateTo('edit-poll', poll.id);
-            });
-
             pollCard.querySelector('.delete').addEventListener('click', (e) => {
                 e.stopPropagation();
                 confirmDeletePoll(poll.id, poll.title);
@@ -664,158 +636,6 @@ async function loadVotersForPoll(pollId) {
         table.appendChild(tbody);
         votersList.innerHTML = '';
         votersList.appendChild(table);
-    }
-}
-
-async function loadEditPollForm(id) {
-    if (!isAdmin) {
-        navigateTo('admin-login');
-        return;
-    }
-
-    currentPollId = id;
-    currentPoll = await fetchAPI(`/polls/${id}`);
-
-    if (currentPoll) {
-        // Fill in the form fields
-        document.getElementById('edit-poll-id').value = currentPoll.id;
-        document.getElementById('edit-poll-title').value = currentPoll.title;
-        document.getElementById('edit-poll-description').value = currentPoll.description || '';
-        document.getElementById('poll-status').value = currentPoll.locked ? 'locked' : 'open';
-
-        // Set up options
-        const optionsContainer = document.getElementById('edit-options-container');
-        optionsContainer.innerHTML = '';
-
-        currentPoll.options.forEach(option => {
-            const optionInput = document.createElement('div');
-            optionInput.className = 'edit-option-input';
-
-            // Store the option ID if available
-            const optionId = typeof option === 'object' ? option.id : '';
-            const optionText = typeof option === 'object' ? option.text : option;
-
-            optionInput.innerHTML = `
-                <input type="text" class="poll-option" value="${escapeHTML(optionText)}" required data-id="${optionId}">
-                <button type="button" class="remove-option">×</button>
-            `;
-
-            optionsContainer.appendChild(optionInput);
-        });
-
-        // Show remove buttons if we have more than 2 options
-        if (currentPoll.options.length <= 2) {
-            optionsContainer.querySelectorAll('.remove-option').forEach(button => {
-                button.classList.add('hidden');
-            });
-        }
-    }
-
-    loading.classList.add('hidden');
-}
-
-function addEditOptionInput() {
-    const optionsContainer = document.getElementById('edit-options-container');
-    const optionInputs = optionsContainer.querySelectorAll('.edit-option-input');
-
-    // Show remove buttons if we're adding more than the minimum
-    if (optionInputs.length >= 2) {
-        optionInputs.forEach(input => {
-            input.querySelector('.remove-option').classList.remove('hidden');
-        });
-    }
-
-    const newOption = document.createElement('div');
-    newOption.className = 'edit-option-input';
-    newOption.innerHTML = `
-        <input type="text" class="poll-option" required>
-        <button type="button" class="remove-option">×</button>
-    `;
-
-    optionsContainer.appendChild(newOption);
-}
-
-function removeEditOptionInput(optionElement) {
-    const optionsContainer = document.getElementById('edit-options-container');
-    const optionInputs = optionsContainer.querySelectorAll('.edit-option-input');
-
-    // Prevent removing if we only have 2 options left
-    if (optionInputs.length <= 2) {
-        showPopup('A poll must have at least 2 options.', 'Information', 'info');
-        return;
-    }
-
-    optionElement.remove();
-
-    // Hide remove buttons if we're down to the minimum
-    const remainingInputs = optionsContainer.querySelectorAll('.edit-option-input');
-    if (remainingInputs.length <= 2) {
-        remainingInputs.forEach(input => {
-            input.querySelector('.remove-option').classList.add('hidden');
-        });
-    }
-}
-
-async function handleEditPoll(e) {
-    e.preventDefault();
-
-    const pollId = document.getElementById('edit-poll-id').value;
-    const title = document.getElementById('edit-poll-title').value;
-    const description = document.getElementById('edit-poll-description').value;
-    const status = document.getElementById('poll-status').value;
-
-    const optionInputs = document.querySelectorAll('#edit-options-container .poll-option');
-    const options = [];
-    const optionIds = [];
-
-    // Collect options data
-    optionInputs.forEach(input => {
-        const text = input.value.trim();
-        const id = input.dataset.id;
-
-        if (text !== '') {
-            if (id) {
-                // This is an existing option
-                options.push({
-                    id: parseInt(id),
-                    text: text
-                });
-                optionIds.push(parseInt(id));
-            } else {
-                // This is a new option
-                options.push({
-                    text: text
-                });
-            }
-        }
-    });
-
-    if (options.length < 2) {
-        showPopup('Please provide at least 2 options.', 'Error', 'error');
-        return;
-    }
-
-    const pollData = {
-        title,
-        description,
-        locked: status === 'locked',
-        options: options,
-        // Include IDs of options that should be kept (for backend to know which to delete)
-        option_ids: optionIds.length > 0 ? optionIds : undefined
-    };
-
-    loading.classList.remove('hidden');
-
-    const result = await fetchAPI(`/polls/${pollId}`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(pollData)
-    });
-
-    if (result) {
-        navigateTo('admin-dashboard');
     }
 }
 

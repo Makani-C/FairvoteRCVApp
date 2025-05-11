@@ -1,12 +1,6 @@
 #!/bin/bash
 set -e
 
-echo "Checking DATABASE_URL format..."
-if [[ $DATABASE_URL == postgres://* ]]; then
-  echo "Converting postgres:// to postgresql:// in DATABASE_URL"
-  export DATABASE_URL=${DATABASE_URL/postgres:/postgresql:}
-fi
-
 echo "Waiting for database to be ready..."
 python - <<EOF
 import time

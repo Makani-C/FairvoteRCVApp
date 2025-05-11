@@ -3,6 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 
@@ -10,7 +11,6 @@ from database.session import engine, Base, get_db
 from database.models import Poll, Option, Vote
 from schemas import Poll as PollSchema, PollCreate, Vote as VoteSchema, VoteCreate
 from utils.results import calculate_ranked_choice_results
-
 
 
 # ============ Main Application Routes ============
@@ -23,8 +23,9 @@ async def root():
 
 
 @base_router.get("/health")
-async def health_check():
+async def health_check(db: Session = Depends(get_db)):
     """Health check endpoint"""
+    result = db.execute(text("SELECT 1")).scalar()
     return {"status": "healthy"}
 
 

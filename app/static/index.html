@@ -140,38 +140,6 @@
             </div>
         </section>
 
-        <!-- Edit Poll View -->
-        <section id="edit-poll-page" class="page hidden">
-            <h2>Edit Poll</h2>
-            <form id="edit-poll-form">
-                <input type="hidden" id="edit-poll-id">
-                <div class="form-group">
-                    <label for="edit-poll-title">Poll Title</label>
-                    <input type="text" id="edit-poll-title" required>
-                </div>
-                <div class="form-group">
-                    <label for="edit-poll-description">Description (Optional)</label>
-                    <textarea id="edit-poll-description"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Options</label>
-                    <div id="edit-options-container"></div>
-                    <button type="button" id="edit-add-option">+ Add Option</button>
-                </div>
-                <div class="form-group">
-                    <label for="poll-status">Poll Status</label>
-                    <select id="poll-status">
-                        <option value="open">Open</option>
-                        <option value="locked">Locked</option>
-                    </select>
-                </div>
-                <div class="button-group">
-                    <button type="submit" class="btn-primary">Save Changes</button>
-                    <button type="button" id="cancel-edit" class="btn-secondary">Cancel</button>
-                </div>
-            </form>
-        </section>
-
         <div id="popup-container" class="popup-container hidden">
             <div class="popup">
                 <div class="popup-header">

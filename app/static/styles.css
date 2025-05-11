@@ -303,18 +303,18 @@ textarea {
 }
 
 /* Create Poll Page */
-#options-container, #edit-options-container {
+#options-container {
   margin-bottom: 1.25rem;
 }
 
-.option-input, .edit-option-input {
+.option-input {
   display: flex;
   align-items: center;
   margin-bottom: 0.75rem;
   position: relative;
 }
 
-.option-input input, .edit-option-input input {
+.option-input input, input {
   flex: 1;
   padding-right: 3rem;
 }
@@ -339,7 +339,7 @@ textarea {
   transform: rotate(90deg);
 }
 
-#add-option, #edit-add-option {
+#add-option {
   background-color: transparent;
   color: var(--primary-color);
   padding: 0.5rem 1rem;
@@ -350,7 +350,7 @@ textarea {
   border-radius: var(--radius-md);
 }
 
-#add-option:hover, #edit-add-option:hover {
+#add-option:hover {
   background-color: rgba(67, 97, 238, 0.05);
   border-color: var(--primary-color);
 }
