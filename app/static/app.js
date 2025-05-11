@@ -434,6 +434,7 @@ async function loadResults(id) {
     }
 
     const resultsData = await fetchAPI(`/results/api/poll/${id}`);
+    
     let userVote = null;
     const voterEmail = localStorage.getItem(`voter_${id}`);
     const voterRankings = localStorage.getItem(`voter_rankings_${id}`);
