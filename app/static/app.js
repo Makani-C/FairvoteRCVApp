@@ -434,12 +434,28 @@ async function loadResults(id) {
     }
 
     const resultsData = await fetchAPI(`/results/api/poll/${id}`);
+    let userVote = null;
+    const voterEmail = localStorage.getItem(`voter_${id}`);
+    const voterRankings = localStorage.getItem(`voter_rankings_${id}`);
+    
+    if (voterEmail) {
+        const votes = await fetchAPI(`/votes/poll/${id}`);
+        if (votes) {
+            userVote = votes.find(vote => vote.email === voterEmail);
+        }
+        
+        if (!userVote && voterRankings) {
+            userVote = {
+                email: voterEmail,
+                rankings: JSON.parse(voterRankings)
+            };
+        }
+    }
 
     if (currentPoll && resultsData) {
         document.getElementById('results-poll-title').textContent = currentPoll.title;
 
-        // Render the results visualization
-        renderResultsVisualization(resultsData);
+        renderResultsVisualization(resultsData, userVote);
     }
 }
 
@@ -885,6 +901,9 @@ async function handleSubmitVote() {
         return;
     }
 
+    // Store the voter's email in localStorage to identify their vote in results
+    localStorage.setItem(`voter_${currentPollId}`, email);
+
     // Collect the rankings from all options that have a rank selected
     const rankings = [];
     const optionRows = document.querySelectorAll('.option-rank-row');
@@ -934,6 +953,9 @@ async function handleSubmitVote() {
     });
 
     if (result) {
+        // Also store the actual rankings for easier access in the results view
+        localStorage.setItem(`voter_rankings_${currentPollId}`, JSON.stringify(voteData.rankings));
+        
         showPopup('Your vote has been recorded!', 'Success', 'success', () => {
             navigateTo('results', currentPollId);
         });
@@ -1060,7 +1082,7 @@ function updateRankingNumbers() {
  * Renders the results visualization for a ranked choice vote
  * @param {Object} resultsData - The data from the API containing voting results
  */
-function renderResultsVisualization(resultsData) {
+function renderResultsVisualization(resultsData, userVote = null) {
     if (!resultsData) {
         console.error('No results data available');
         return;
@@ -1090,7 +1112,7 @@ function renderResultsVisualization(resultsData) {
         }
     });
 
-    // Add CSS for winner and eliminated styles if not already in the styles.css
+    // Add CSS for winner, eliminated, and your-vote styles if not already in the styles.css
     if (!document.getElementById('rcv-result-styles')) {
         const styleEl = document.createElement('style');
         styleEl.id = 'rcv-result-styles';
@@ -1103,13 +1125,89 @@ function renderResultsVisualization(resultsData) {
                 background-color: var(--success-color);
                 font-weight: bold;
             }
+            .result-bar-inner.your-vote {
+                position: relative;
+            }
+            .your-vote-badge {
+                background-color: var(--warning-color);
+                color: var(--text-color);
+                padding: 0.2rem 0.5rem;
+                margin-left: 0.5rem;
+                font-size: 0.8rem;
+                border-radius: var(--radius-full);
+                font-weight: bold;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.2rem;
+            }
+            .your-vote-badge::before {
+                content: '👤';
+                font-size: 0.9rem;
+            }
+            .your-vote-legend {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                margin-bottom: 1.5rem;
+                padding: 0.75rem 1rem;
+                background-color: rgba(67, 97, 238, 0.05);
+                border-radius: var(--radius-md);
+                border-left: 3px solid var(--primary-color);
+            }
+            .your-vote-legend-icon {
+                font-size: 1.2rem;
+            }
+            .your-vote-legend-text {
+                font-size: 0.9rem;
+                color: var(--text-color);
+            }
         `;
         document.head.appendChild(styleEl);
+    }
+
+    // Helper function to determine which option is receiving the user's vote in this round
+    function getUserVoteInRound(round, userVote) {
+        if (!userVote || !userVote.rankings) return null;
+
+        // Convert string option IDs to their text representation
+        const optionIdToText = {};
+        if (currentPoll && currentPoll.options) {
+            currentPoll.options.forEach(option => {
+                if (typeof option === 'object' && option.id && option.text) {
+                    optionIdToText[option.id] = option.text;
+                } else if (typeof option === 'string') {
+                    // If option is just a string, use it as both id and text
+                    optionIdToText[option] = option;
+                }
+            });
+        }
+
+        // Find the user's highest ranked option that is still in this round
+        let activeOptions = Object.keys(round.counts);
+        let userRankings = [...Object.entries(userVote.rankings)]
+            .map(([optId, rank]) => ({ 
+                optionId: optId, 
+                optionText: optionIdToText[optId] || optId,
+                rank 
+            }))
+            .sort((a, b) => a.rank - b.rank); // Sort by rank (1st, 2nd, 3rd...)
+
+        // Find the highest ranked option that's still active
+        for (const ranking of userRankings) {
+            if (activeOptions.includes(ranking.optionText)) {
+                return ranking.optionText;
+            }
+        }
+
+        return null; // No active vote in this round
     }
 
     // Render Round 1
     if (rounds.length > 0) {
         const round1 = rounds[0];
+        
+        // Determine where the user's vote is in this round
+        const userVoteOption = userVote ? getUserVoteInRound(round1, userVote) : null;
 
         if (!round1.counts) {
             round1Results.innerHTML = '<p>No vote data available</p>';
@@ -1120,6 +1218,7 @@ function renderResultsVisualization(resultsData) {
 
                 const isEliminated = round1.eliminated === optionText;
                 const isWinner = round1.winner === optionText;
+                const isUserVote = optionText === userVoteOption;
 
                 const resultBar = document.createElement('div');
                 resultBar.className = 'result-bar-container';
@@ -1128,14 +1227,18 @@ function renderResultsVisualization(resultsData) {
                 if (isEliminated) barClass += ' eliminated';
                 if (isWinner) barClass += ' winner';
 
+                let statusText = '';
+                if (isWinner) statusText += ' (Winner)';
+                if (isEliminated) statusText += ' (Eliminated)';
+                
                 resultBar.innerHTML = `
                     <div class="result-bar-label">
-                        <span>${escapeHTML(optionText)}</span>
+                        <span>${escapeHTML(optionText)}${isUserVote ? '<span class="your-vote-badge">Your Vote</span>' : ''}</span>
                         <span>${votes} vote${votes !== 1 ? 's' : ''}</span>
                     </div>
                     <div class="result-bar-outer">
                         <div class="${barClass}" style="width: ${percentage}%;">
-                            ${votes}${isWinner ? ' (Winner)' : ''}${isEliminated ? ' (Eliminated)' : ''}
+                            ${votes}${statusText}
                         </div>
                     </div>
                 `;
@@ -1153,6 +1256,9 @@ function renderResultsVisualization(resultsData) {
             roundDiv.className = 'round-results';
             roundDiv.innerHTML = `<h3>Round ${i + 1}</h3>`;
 
+            // Determine where the user's vote is in this round
+            const userVoteOption = userVote ? getUserVoteInRound(round, userVote) : null;
+
             if (!round.counts) {
                 roundDiv.innerHTML += '<p>No vote data available for this round</p>';
                 additionalRounds.appendChild(roundDiv);
@@ -1165,6 +1271,7 @@ function renderResultsVisualization(resultsData) {
 
                 const isEliminated = round.eliminated === optionText;
                 const isWinner = round.winner === optionText;
+                const isUserVote = optionText === userVoteOption;
 
                 const resultBar = document.createElement('div');
                 resultBar.className = 'result-bar-container';
@@ -1172,15 +1279,20 @@ function renderResultsVisualization(resultsData) {
                 let barClass = 'result-bar-inner';
                 if (isEliminated) barClass += ' eliminated';
                 if (isWinner) barClass += ' winner';
+                if (isUserVote) barClass += ' your-vote';
+
+                let statusText = '';
+                if (isWinner) statusText += ' (Winner)';
+                if (isEliminated) statusText += ' (Eliminated)';
 
                 resultBar.innerHTML = `
                     <div class="result-bar-label">
-                        <span>${escapeHTML(optionText)}</span>
+                        <span>${escapeHTML(optionText)}${isUserVote ? '<span class="your-vote-badge">Your Vote</span>' : ''}</span>
                         <span>${votes} vote${votes !== 1 ? 's' : ''}</span>
                     </div>
                     <div class="result-bar-outer">
                         <div class="${barClass}" style="width: ${percentage}%;">
-                            ${votes}${isWinner ? ' (Winner)' : ''}${isEliminated ? ' (Eliminated)' : ''}
+                            ${votes}${statusText}
                         </div>
                     </div>
                 `;

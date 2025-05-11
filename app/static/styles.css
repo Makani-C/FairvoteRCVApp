@@ -512,7 +512,6 @@ textarea {
 
 .result-bar-container {
   margin-bottom: 1.75rem;
-  animation: fadeIn 0.5s ease-out;
 }
 
 @keyframes fadeIn {
@@ -563,7 +562,6 @@ textarea {
     rgba(255, 255, 255, 0.2) 50%, 
     rgba(255, 255, 255, 0.1) 100%);
   transform: skewX(-20deg) translateX(-100%);
-  animation: shimmer 3s infinite;
 }
 
 @keyframes shimmer {
