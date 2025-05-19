@@ -1080,6 +1080,7 @@ function updateRankingNumbers() {
 /**
  * Renders the results visualization for a ranked choice vote
  * @param {Object} resultsData - The data from the API containing voting results
+ * @param {Object} userVote - The user's vote data if they just voted
  */
 function renderResultsVisualization(resultsData, userVote = null) {
     if (!resultsData) {
@@ -1101,6 +1102,22 @@ function renderResultsVisualization(resultsData, userVote = null) {
     round1Results.innerHTML = '';
     additionalRounds.innerHTML = '';
 
+    // Add an explanatory header
+    const explanationDiv = document.createElement('div');
+    explanationDiv.className = 'rcv-explanation';
+    explanationDiv.innerHTML = `
+        <div class="rcv-intro">
+            <h4>How Ranked Choice Voting Works</h4>
+            <p>In ranked choice voting, if no candidate gets a majority (more than 50%) of first-choice votes, 
+            the candidate with the fewest votes is eliminated and their votes are redistributed to voters' 
+            next choices. This process continues until one candidate has a majority.</p>
+        </div>
+    `;
+    
+    // Insert explanation before the first round
+    const resultsContainer = round1Results.parentElement;
+    resultsContainer.insertBefore(explanationDiv, resultsContainer.firstChild);
+
     // Determine the maximum vote count for scaling
     let maxVotes = 0;
     rounds.forEach(round => {
@@ -1110,6 +1127,11 @@ function renderResultsVisualization(resultsData, userVote = null) {
             });
         }
     });
+
+    // Calculate total votes in first round for majority threshold
+    const totalVotes = rounds[0] && rounds[0].counts ? 
+        Object.values(rounds[0].counts).reduce((sum, count) => sum + count, 0) : 0;
+    const majorityThreshold = Math.floor(totalVotes / 2) + 1;
 
     // Add CSS for winner, eliminated, and your-vote styles if not already in the styles.css
     if (!document.getElementById('rcv-result-styles')) {
@@ -1142,23 +1164,6 @@ function renderResultsVisualization(resultsData, userVote = null) {
             .your-vote-badge::before {
                 content: '👤';
                 font-size: 0.9rem;
-            }
-            .your-vote-legend {
-                display: flex;
-                align-items: center;
-                gap: 0.5rem;
-                margin-bottom: 1.5rem;
-                padding: 0.75rem 1rem;
-                background-color: rgba(67, 97, 238, 0.05);
-                border-radius: var(--radius-md);
-                border-left: 3px solid var(--primary-color);
-            }
-            .your-vote-legend-icon {
-                font-size: 1.2rem;
-            }
-            .your-vote-legend-text {
-                font-size: 0.9rem;
-                color: var(--text-color);
             }
         `;
         document.head.appendChild(styleEl);
@@ -1201,19 +1206,62 @@ function renderResultsVisualization(resultsData, userVote = null) {
         return null; // No active vote in this round
     }
 
+    // Helper function to describe the journey of the user's vote
+    function getUserVoteJourney(rounds, userVote) {
+        if (!userVote || !userVote.rankings) return '';
+
+        const journey = [];
+        for (let i = 0; i < rounds.length; i++) {
+            const userVoteInRound = getUserVoteInRound(rounds[i], userVote);
+            if (userVoteInRound) {
+                if (i === 0) {
+                    journey.push(`started with ${userVoteInRound}`);
+                } else {
+                    journey.push(`transferred to ${userVoteInRound} in round ${i + 1}`);
+                }
+                
+                // Check if this is where it ended
+                if (rounds[i].winner === userVoteInRound) {
+                    journey.push(`and helped elect the winner!`);
+                    break;
+                } else if (rounds[i].eliminated === userVoteInRound && i < rounds.length - 1) {
+                    // Vote will transfer in next round
+                }
+            }
+        }
+
+        return journey.length > 0 ? journey.join(', ') + '.' : 'was cast but did not affect the final outcome.';
+    }
+
     // Render Round 1
     if (rounds.length > 0) {
         const round1 = rounds[0];
+        
+        // Add round header with explanation
+        const roundHeader = document.createElement('div');
+        roundHeader.className = 'round-header';
+        roundHeader.innerHTML = `
+            <h3>Round 1 - Initial Vote Count</h3>
+            <p class="round-explanation">
+                First-choice votes are counted. ${totalVotes} total votes cast. 
+                A candidate needs ${majorityThreshold} votes (majority) to win.
+            </p>
+        `;
+        round1Results.appendChild(roundHeader);
         
         // Determine where the user's vote is in this round
         const userVoteOption = userVote ? getUserVoteInRound(round1, userVote) : null;
 
         if (!round1.counts) {
-            round1Results.innerHTML = '<p>No vote data available</p>';
+            round1Results.innerHTML += '<p>No vote data available</p>';
         } else {
+            // Check if there's a winner in round 1
+            const hasWinner = Object.values(round1.counts).some(count => count >= majorityThreshold);
+            
             Object.keys(round1.counts).forEach(optionText => {
                 const votes = round1.counts[optionText];
                 const percentage = maxVotes > 0 ? (votes / maxVotes) * 100 : 0;
+                const votePercentage = totalVotes > 0 ? ((votes / totalVotes) * 100).toFixed(1) : 0;
 
                 const isEliminated = round1.eliminated === optionText;
                 const isWinner = round1.winner === optionText;
@@ -1227,13 +1275,23 @@ function renderResultsVisualization(resultsData, userVote = null) {
                 if (isWinner) barClass += ' winner';
 
                 let statusText = '';
-                if (isWinner) statusText += ' (Winner)';
-                if (isEliminated) statusText += ' (Eliminated)';
+                let statusExplanation = '';
+                if (isWinner && hasWinner) {
+                    statusText += ' (Winner)';
+                    statusExplanation = ` - Won with ${votePercentage}% of the vote`;
+                } else if (isEliminated) {
+                    statusText += ' (Eliminated)';
+                    statusExplanation = ` - Fewest votes, eliminated first`;
+                } else if (votes >= majorityThreshold) {
+                    statusExplanation = ` - Has majority (${votePercentage}%)`;
+                } else {
+                    statusExplanation = ` - ${votePercentage}% of votes`;
+                }
                 
                 resultBar.innerHTML = `
                     <div class="result-bar-label">
                         <span>${escapeHTML(optionText)}${isUserVote ? '<span class="your-vote-badge">Your Vote</span>' : ''}</span>
-                        <span>${votes} vote${votes !== 1 ? 's' : ''}</span>
+                        <span>${votes} vote${votes !== 1 ? 's' : ''}${statusExplanation}</span>
                     </div>
                     <div class="result-bar-outer">
                         <div class="${barClass}" style="width: ${percentage}%;">
@@ -1244,6 +1302,18 @@ function renderResultsVisualization(resultsData, userVote = null) {
 
                 round1Results.appendChild(resultBar);
             });
+            
+            // Add explanation if no winner
+            if (!hasWinner && rounds.length > 1) {
+                const noWinnerExplanation = document.createElement('div');
+                noWinnerExplanation.className = 'round-conclusion';
+                noWinnerExplanation.innerHTML = `
+                    <p><strong>No candidate reached the majority threshold of ${majorityThreshold} votes.</strong> 
+                    The candidate with the fewest votes (${round1.eliminated}) is eliminated, and 
+                    their votes are redistributed to voters' next choices.</p>
+                `;
+                round1Results.appendChild(noWinnerExplanation);
+            }
         }
     }
 
@@ -1251,9 +1321,29 @@ function renderResultsVisualization(resultsData, userVote = null) {
     if (rounds.length > 1) {
         for (let i = 1; i < rounds.length; i++) {
             const round = rounds[i];
+            const previousRound = rounds[i - 1];
             const roundDiv = document.createElement('div');
             roundDiv.className = 'round-results';
-            roundDiv.innerHTML = `<h3>Round ${i + 1}</h3>`;
+            
+            // Calculate remaining total votes for this round
+            const roundTotalVotes = round.counts ? 
+                Object.values(round.counts).reduce((sum, count) => sum + count, 0) : 0;
+            const roundMajorityThreshold = Math.floor(roundTotalVotes / 2) + 1;
+            
+            // Add round header with explanation
+            const roundHeader = document.createElement('div');
+            roundHeader.className = 'round-header';
+            const isLastRound = i === rounds.length - 1;
+            
+            roundHeader.innerHTML = `
+                <h3>Round ${i + 1}${isLastRound ? ' - Final Round' : ''}</h3>
+                <p class="round-explanation">
+                    ${previousRound.eliminated} was eliminated. Their ${previousRound.counts[previousRound.eliminated]} votes 
+                    were redistributed to voters' next choices. ${roundTotalVotes} votes remain active.
+                    ${isLastRound ? '' : `A candidate needs ${roundMajorityThreshold} votes to win.`}
+                </p>
+            `;
+            roundDiv.appendChild(roundHeader);
 
             // Determine where the user's vote is in this round
             const userVoteOption = userVote ? getUserVoteInRound(round, userVote) : null;
@@ -1264,13 +1354,22 @@ function renderResultsVisualization(resultsData, userVote = null) {
                 continue;
             }
 
+            // Check if there's a winner in this round
+            const hasWinner = round.winner !== undefined;
+
             Object.keys(round.counts).forEach(optionText => {
                 const votes = round.counts[optionText];
                 const percentage = maxVotes > 0 ? (votes / maxVotes) * 100 : 0;
+                const votePercentage = roundTotalVotes > 0 ? ((votes / roundTotalVotes) * 100).toFixed(1) : 0;
 
                 const isEliminated = round.eliminated === optionText;
                 const isWinner = round.winner === optionText;
                 const isUserVote = optionText === userVoteOption;
+
+                // Calculate vote changes from previous round
+                const previousVotes = (previousRound.counts && previousRound.counts[optionText]) || 0;
+                const voteChange = votes - previousVotes;
+                const changeText = voteChange > 0 ? ` (+${voteChange})` : voteChange < 0 ? ` (${voteChange})` : '';
 
                 const resultBar = document.createElement('div');
                 resultBar.className = 'result-bar-container';
@@ -1281,13 +1380,21 @@ function renderResultsVisualization(resultsData, userVote = null) {
                 if (isUserVote) barClass += ' your-vote';
 
                 let statusText = '';
-                if (isWinner) statusText += ' (Winner)';
-                if (isEliminated) statusText += ' (Eliminated)';
+                let statusExplanation = '';
+                if (isWinner) {
+                    statusText += ' (Winner)';
+                    statusExplanation = ` - Won with ${votePercentage}% of remaining votes`;
+                } else if (isEliminated) {
+                    statusText += ' (Eliminated)';
+                    statusExplanation = ` - Fewest votes${changeText}, eliminated next`;
+                } else {
+                    statusExplanation = ` - ${votePercentage}% of votes${changeText}`;
+                }
 
                 resultBar.innerHTML = `
                     <div class="result-bar-label">
                         <span>${escapeHTML(optionText)}${isUserVote ? '<span class="your-vote-badge">Your Vote</span>' : ''}</span>
-                        <span>${votes} vote${votes !== 1 ? 's' : ''}</span>
+                        <span>${votes} vote${votes !== 1 ? 's' : ''}${statusExplanation}</span>
                     </div>
                     <div class="result-bar-outer">
                         <div class="${barClass}" style="width: ${percentage}%;">
@@ -1299,8 +1406,45 @@ function renderResultsVisualization(resultsData, userVote = null) {
                 roundDiv.appendChild(resultBar);
             });
 
+            // Add conclusion for each round
+            if (hasWinner) {
+                const winnerConclusion = document.createElement('div');
+                winnerConclusion.className = 'round-conclusion winner-conclusion';
+                winnerConclusion.innerHTML = `
+                    <p><strong>${round.winner} wins!</strong> 
+                    They received ${round.counts[round.winner]} votes (${((round.counts[round.winner] / roundTotalVotes) * 100).toFixed(1)}%) 
+                    in the final round, achieving the majority needed to win.</p>
+                `;
+                roundDiv.appendChild(winnerConclusion);
+            } else if (round.eliminated && i < rounds.length - 1) {
+                const eliminationConclusion = document.createElement('div');
+                eliminationConclusion.className = 'round-conclusion';
+                eliminationConclusion.innerHTML = `
+                    <p><strong>Still no majority winner.</strong> 
+                    ${round.eliminated} has the fewest votes and is eliminated. 
+                    Their votes will be redistributed in the next round.</p>
+                `;
+                roundDiv.appendChild(eliminationConclusion);
+            }
+
             additionalRounds.appendChild(roundDiv);
         }
+    }
+
+    // Add a final summary if there are multiple rounds
+    if (rounds.length > 1) {
+        const finalSummary = document.createElement('div');
+        finalSummary.className = 'final-summary';
+        const finalRound = rounds[rounds.length - 1];
+        const winner = finalRound.winner;
+        finalSummary.innerHTML = `
+            <div class="summary-box">
+                <h4>Election Summary</h4>
+                <p><strong>${winner}</strong> won this ranked choice election after ${rounds.length} round${rounds.length > 1 ? 's' : ''} of counting.</p>
+                ${userVote ? `<p class="your-vote-summary">Your vote ${getUserVoteJourney(rounds, userVote)}</p>` : ''}
+            </div>
+        `;
+        additionalRounds.appendChild(finalSummary);
     }
 }
 
