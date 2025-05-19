@@ -127,6 +127,10 @@ function navigateTo(page, id = null) {
         return;
     }
 
+    if (page !== 'results' && currentPollId) {
+        localStorage.removeItem(`just_voted_${currentPollId}`);
+    }
+
     // Load appropriate page
     switch(page) {
         case 'polls':
@@ -160,7 +164,6 @@ function navigateTo(page, id = null) {
             break;
 
         case 'admin-dashboard':
-            // Load admin dashboard content
             loadAdminPolls();
             document.getElementById('admin-dashboard-page').classList.remove('hidden');
             break;
@@ -436,26 +439,25 @@ async function loadResults(id) {
     const resultsData = await fetchAPI(`/results/api/poll/${id}`);
     
     let userVote = null;
-    const voterEmail = localStorage.getItem(`voter_${id}`);
-    const voterRankings = localStorage.getItem(`voter_rankings_${id}`);
     
-    if (voterEmail) {
-        const votes = await fetchAPI(`/votes/poll/${id}`);
-        if (votes) {
-            userVote = votes.find(vote => vote.email === voterEmail);
-        }
+    const justVoted = localStorage.getItem(`just_voted_${id}`) === 'true';
+    
+    if (justVoted) {
+        const voterEmail = localStorage.getItem(`voter_${id}`);
+        const voterRankings = localStorage.getItem(`voter_rankings_${id}`);
         
-        if (!userVote && voterRankings) {
+        if (voterEmail && voterRankings) {
             userVote = {
                 email: voterEmail,
                 rankings: JSON.parse(voterRankings)
             };
         }
+        
+        localStorage.removeItem(`just_voted_${id}`);
     }
 
     if (currentPoll && resultsData) {
         document.getElementById('results-poll-title').textContent = currentPoll.title;
-
         renderResultsVisualization(resultsData, userVote);
     }
 }
@@ -902,9 +904,6 @@ async function handleSubmitVote() {
         return;
     }
 
-    // Store the voter's email in localStorage to identify their vote in results
-    localStorage.setItem(`voter_${currentPollId}`, email);
-
     // Collect the rankings from all options that have a rank selected
     const rankings = [];
     const optionRows = document.querySelectorAll('.option-rank-row');
@@ -913,7 +912,6 @@ async function handleSubmitVote() {
         const optionId = row.dataset.optionId;
         const selectedRankBtn = row.querySelector('.rank-button.selected');
 
-        // Only include options that have been ranked (have a selected rank button)
         if (selectedRankBtn) {
             const rank = parseInt(selectedRankBtn.dataset.rank);
             rankings.push({
@@ -921,25 +919,20 @@ async function handleSubmitVote() {
                 rank: rank
             });
         }
-        // Options without a selected rank button are not included
     });
 
-    // Validate that at least one option is ranked
     if (rankings.length === 0) {
         showPopup('Please rank at least one option.', 'Error', 'error');
         return;
     }
 
-    // Create the vote data object in the format expected by your backend
     const voteData = {
         email,
         poll_id: currentPollId,
         rankings: {}
     };
 
-    // Convert the rankings array to the format expected by your API
     rankings.forEach(item => {
-        // Here we assume your backend expects a mapping of option IDs to rank values
         voteData.rankings[item.option] = item.rank;
     });
 
@@ -954,8 +947,13 @@ async function handleSubmitVote() {
     });
 
     if (result) {
-        // Also store the actual rankings for easier access in the results view
+        // Clear any existing flags first to ensure clean state
+        localStorage.removeItem(`just_voted_${currentPollId}`);
+        
+        // Store vote data and set the just-voted flag
+        localStorage.setItem(`voter_${currentPollId}`, email);
         localStorage.setItem(`voter_rankings_${currentPollId}`, JSON.stringify(voteData.rankings));
+        localStorage.setItem(`just_voted_${currentPollId}`, 'true');
         
         showPopup('Your vote has been recorded!', 'Success', 'success', () => {
             navigateTo('results', currentPollId);
