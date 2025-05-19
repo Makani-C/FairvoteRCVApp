@@ -1313,3 +1313,129 @@ textarea {
   70% { box-shadow: 0 0 0 15px rgba(6, 214, 160, 0); }
   100% { box-shadow: 0 0 0 0 rgba(6, 214, 160, 0); }
 }
+/* Enhanced Results with Explanations */
+.rcv-explanation {
+  background-color: rgba(91, 118, 244, 0.05);
+  border-left: 4px solid var(--primary-color);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  border-radius: var(--radius-md);
+}
+
+.rcv-intro h4 {
+  color: var(--primary-color);
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+}
+
+.rcv-intro p {
+  color: var(--text-color);
+  line-height: 1.6;
+  margin-bottom: 0;
+}
+
+.round-header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.round-header h3 {
+  color: var(--text-color);
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.round-header h3::before {
+  content: '🗳️';
+  font-size: 1.5rem;
+}
+
+.round-explanation {
+  color: var(--text-light);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin-bottom: 0;
+  padding: 0.75rem 1rem;
+  background-color: rgba(243, 244, 246, 0.7);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--primary-light);
+}
+
+.round-conclusion {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  background-color: rgba(107, 114, 128, 0.05);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--text-light);
+}
+
+.round-conclusion p {
+  margin: 0;
+  color: var(--text-color);
+  font-weight: 500;
+}
+
+.winner-conclusion {
+  background-color: rgba(6, 214, 160, 0.05);
+  border-left-color: var(--success-color);
+}
+
+.winner-conclusion p {
+  color: var(--success-color);
+}
+
+.final-summary {
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 3px solid var(--primary-color);
+}
+
+.summary-box {
+  background: linear-gradient(135deg, rgba(91, 118, 244, 0.05) 0%, rgba(76, 201, 240, 0.05) 100%);
+  border: 1px solid rgba(91, 118, 244, 0.2);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  text-align: center;
+}
+
+.summary-box h4 {
+  color: var(--primary-color);
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.summary-box h4::before {
+  content: '🏆';
+  font-size: 1.75rem;
+}
+
+.summary-box p {
+  color: var(--text-color);
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.summary-box p:last-child {
+  margin-bottom: 0;
+}
+
+.your-vote-summary {
+  background-color: rgba(255, 209, 102, 0.1);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--warning-color);
+  margin-top: 1.5rem !important;
+  font-style: italic;
+}
+
+.your-vote-summary::before {
+  content: '👤 ';
+  font-style: normal;
+}
