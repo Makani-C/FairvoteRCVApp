@@ -1098,9 +1098,14 @@ function renderResultsVisualization(resultsData, userVote = null) {
     const round1Results = document.getElementById('round-1-results');
     const additionalRounds = document.getElementById('additional-rounds');
 
-    // Clear previous results
+    // Clear previous results and any existing explanations
     round1Results.innerHTML = '';
     additionalRounds.innerHTML = '';
+
+    // Remove any existing explanation divs
+    const resultsContainer = round1Results.parentElement;
+    const existingExplanations = resultsContainer.querySelectorAll('.rcv-explanation');
+    existingExplanations.forEach(explanation => explanation.remove());
 
     // Add an explanatory header
     const explanationDiv = document.createElement('div');
@@ -1113,9 +1118,6 @@ function renderResultsVisualization(resultsData, userVote = null) {
             next choices. This process continues until one candidate has a majority.</p>
         </div>
     `;
-    
-    // Insert explanation before the first round
-    const resultsContainer = round1Results.parentElement;
     resultsContainer.insertBefore(explanationDiv, resultsContainer.firstChild);
 
     // Determine the maximum vote count for scaling
@@ -1132,42 +1134,6 @@ function renderResultsVisualization(resultsData, userVote = null) {
     const totalVotes = rounds[0] && rounds[0].counts ? 
         Object.values(rounds[0].counts).reduce((sum, count) => sum + count, 0) : 0;
     const majorityThreshold = Math.floor(totalVotes / 2) + 1;
-
-    // Add CSS for winner, eliminated, and your-vote styles if not already in the styles.css
-    if (!document.getElementById('rcv-result-styles')) {
-        const styleEl = document.createElement('style');
-        styleEl.id = 'rcv-result-styles';
-        styleEl.textContent = `
-            .result-bar-inner.eliminated {
-                background-color: var(--danger-color);
-                opacity: 0.8;
-            }
-            .result-bar-inner.winner {
-                background-color: var(--success-color);
-                font-weight: bold;
-            }
-            .result-bar-inner.your-vote {
-                position: relative;
-            }
-            .your-vote-badge {
-                background-color: var(--warning-color);
-                color: var(--text-color);
-                padding: 0.2rem 0.5rem;
-                margin-left: 0.5rem;
-                font-size: 0.8rem;
-                border-radius: var(--radius-full);
-                font-weight: bold;
-                display: inline-flex;
-                align-items: center;
-                gap: 0.2rem;
-            }
-            .your-vote-badge::before {
-                content: '👤';
-                font-size: 0.9rem;
-            }
-        `;
-        document.head.appendChild(styleEl);
-    }
 
     // Helper function to determine which option is receiving the user's vote in this round
     function getUserVoteInRound(round, userVote) {
